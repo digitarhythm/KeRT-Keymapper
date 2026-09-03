@@ -6,6 +6,54 @@
 
 Vial is an open-source cross-platform (Windows, Linux and Mac) GUI and a QMK fork for configuring your keyboard in real time.
 
+## OS Dance (this fork)
+
+OS Dance lets one key send a different keycode depending on the operating system the keyboard is
+plugged into, detected by QMK's `OS_DETECTION_ENABLE`. A typical use is a single "copy" key that
+sends `LGUI(KC_C)` on macOS and `LCTL(KC_C)` on Windows and Linux without switching layers.
+
+### How it works
+
+OS Dance does not add a new keycode type. The keyboard reserves a range of its tap dance entries
+and the firmware reinterprets each of those entries as a per-OS table:
+
+| Tap dance field | OS Dance meaning |
+|---|---|
+| On tap | macOS (and iOS) |
+| On hold | Windows |
+| On double tap | Linux (and ChromeOS) |
+| On tap + hold | Default: used when the OS is unknown, or when the matching field above is empty |
+| Tapping term | unused |
+
+When the key is pressed, the firmware looks up the detected OS, picks the matching field and sends it.
+An empty field (`KC_NO` or `KC_TRNS`) falls back to Default; if Default is empty too, nothing is sent.
+
+### Keyboard requirements
+
+- Firmware built with `OS_DETECTION_ENABLE = yes` and the OS Dance handling for the reserved
+  tap dance entries (see the `trek/lettio` keyboard in the companion vial-qmk fork for a reference).
+- An `osDance` key in the keyboard's `vial.json` telling Vial which entries are reserved:
+
+```json
+"osDance": { "base": 24, "count": 8 }
+```
+
+With `VIAL_TAP_DANCE_ENTRIES = 32` this reserves `TD(24)`–`TD(31)` as `OD(0)`–`OD(7)`.
+The GUI must match the firmware: `base` and `count` are read from the definition, so keep them in sync
+with the firmware's constants. Keyboards without `osDance` are unaffected and show no OS Dance tab.
+
+### Using it in Vial
+
+1. Open the **OS Dance** tab (next to **Tap Dance**). Each sub-tab `0`, `1`, ... is one OS Dance entry.
+2. Fill in the keycodes for **Mac (iOS)**, **Windows**, **Linux (ChromeOS)** and **Default**.
+   Changes are written to the keyboard immediately, like tap dance keycodes.
+3. In the **Keymap** tab, pick the key and choose `OD(n)` from the **OS Dance** tab of the keycode list.
+   `OD(n)` is stored on the keyboard as `TD(base + n)`; the tooltip shows which tap dance entry it is.
+
+The **Tap Dance** tab only shows the entries below `base`, so regular tap dances and OS Dance never
+overlap. Because the reserved entries are ordinary tap dance storage, OS Dance settings are included in
+**File → Save current layout** and restored with **Load saved layout**.
+
 
 ![](https://get.vial.today/img/vial-win-1.png)
 
