@@ -66,18 +66,19 @@ flowchart LR
 ```
 
 - push と pull request のたびに arm64 版をビルドし、Artifacts に dmg を上げます。
-- `v` で始まるタグ（例: `v0.7.5`）を push すると、ビルド後に `release` ジョブが GitHub Release を作り、
+- タグ（例: `os_dance_support`）を push すると、ビルド後に `release` ジョブが GitHub Release を作り、
   macOS の dmg と Windows x64 のインストーラ・zip を添付します（Windows は upstream 由来の fbs ビルドをそのまま使用）。リポジトリの README にある「最新版のダウンロード」リンクは
   `releases/latest/download/<ファイル名>` を指しているので、新しいリリースを作るたびに自動で最新版になります。
 
-リリースの手順:
+リリースの手順（フォークでは upstream のバージョン番号を据え置き、タグ名は機能名にしています）:
 
 ```bash
-# 1. src/build/settings/base.json と util/macos/rthook_fbs_build_settings.py の version を上げる
-# 2. コミットしてタグを打ち、push する
-git tag v0.7.6
-git push origin main v0.7.6
+git tag os_dance_support
+git push origin os_dance_support
 ```
+
+バージョン番号を変える場合は `src/build/settings/base.json` と `util/macos/rthook_fbs_build_settings.py` の
+両方を更新してください。
 
 ## 仕組みの補足
 

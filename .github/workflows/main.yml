@@ -44,10 +44,12 @@ jobs:
         name: vial-mac-arm64
         path: target/macos-arm64/vial-mac-arm64.dmg
 
-  # On a "v*" tag, publish the macOS (arm64) and Windows (x64) builds as a GitHub Release so that
+  # On any tag push, publish the macOS (arm64) and Windows (x64) builds as a GitHub Release so that
   # https://github.com/<owner>/<repo>/releases/latest/download/<file> always serves the newest one.
+  # Tags are named after the feature (e.g. os_dance_support) rather than a version, since the fork
+  # keeps upstream's version number.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag'
     needs: [build-mac-arm64, build-win]
     runs-on: ubuntu-22.04
     permissions:
