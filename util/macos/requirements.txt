@@ -1,0 +1,9 @@
+# Dependencies for the native macOS builds (util/macos/build.sh), arm64 and x86_64 alike.
+# fbs is installed separately with --no-deps: only fbs_runtime is needed at run time and
+# its pinned PyInstaller 3.4 does not build on current Python.
+PyQt5==5.15.11
+certifi
+keyboard
+simpleeval
+hidapi
+pyinstaller

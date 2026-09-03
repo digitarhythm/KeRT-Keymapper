@@ -71,6 +71,11 @@ class VialApplicationContext(ApplicationContext):
         return result
 
 if __name__ == '__main__':
+    # In a frozen build sys.executable is the app itself; without this, the resource tracker that
+    # multiprocessing.RLock (autorefresh) spawns on macOS/Windows would relaunch the GUI forever.
+    import multiprocessing
+    multiprocessing.freeze_support()
+
     if len(sys.argv) == 2 and sys.argv[1] == "--linux-recorder":
         from linux_keystroke_recorder import linux_keystroke_recorder
 
