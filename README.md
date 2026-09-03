@@ -17,21 +17,23 @@ Vial is an open-source cross-platform (Windows, Linux and Mac) GUI and a QMK for
 
 Visit https://get.vial.today/ to download a binary release of upstream Vial.
 
-#### Download (this fork, macOS)
+#### Download (this fork)
 
 This fork adds the **OS Dance** editor (tap dance entries that send a different keycode per host OS).
-Native macOS builds of the latest release:
+Latest release:
 
-| Mac | Download |
+| Platform | Download |
 |---|---|
-| Apple Silicon (M1 and later) | [vial-mac-arm64.dmg](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-mac-arm64.dmg) |
-| Intel (x86_64 / AMD64) | [vial-mac-x86_64.dmg](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-mac-x86_64.dmg) |
+| macOS, Apple Silicon (M1 and later) | [vial-mac-arm64.dmg](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-mac-arm64.dmg) |
+| Windows, x64 (AMD64) installer | [vial-win-x64-setup.exe](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-win-x64-setup.exe) |
+| Windows, x64 (AMD64) portable | [vial-win-x64.zip](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-win-x64.zip) |
 
+Intel Macs and 32-bit / ARM Windows are not supported by this fork.
 All releases: https://github.com/digitarhythm/vial-gui/releases
 
-The apps are not code-signed. On first launch, right-click `Vial.app` and choose **Open**,
+The apps are not code-signed. On macOS, right-click `Vial.app` and choose **Open** on first launch,
 or run `xattr -d com.apple.quarantine /path/to/Vial.app`.
-Builds are produced by GitHub Actions; see [`util/macos/README.md`](util/macos/README.md) for how to build locally.
+Builds are produced by GitHub Actions; see [`util/macos/README.md`](util/macos/README.md) for how to build the macOS app locally.
 
 #### Development
 

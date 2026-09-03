@@ -1,8 +1,8 @@
-# macOS 版 Vial.app のビルド（Apple Silicon / Intel）
+# macOS 版 Vial.app のビルド（Apple Silicon）
 
-公式 CI の `build-mac` ジョブは Python 3.6.8 と fbs 0.9.0 で `fbs freeze` を実行しており、生成物は x86_64 版のみです。
+upstream の CI にある `build-mac` ジョブは Python 3.6.8 と fbs 0.9.0 で `fbs freeze` を実行しており、生成物は x86_64 版のみです。
 Apple Silicon では Rosetta 2 で動きますが、Rosetta 2 は将来の macOS でサポート終了が予告されているため、
-ここでは **arm64 ネイティブ**と **x86_64（Intel / AMD64）**の両方を PyInstaller で作ります。
+このフォークでは **arm64 ネイティブ版だけ**を PyInstaller で作ります（`build-mac` ジョブはワークフローから外しています）。
 
 fbs 0.9.0 は Python 3.6 / PyInstaller 3.4 に固定されていて現行環境では使えないので、
 PyInstaller を直接使い、fbs が行っていた処理を再現しています。
@@ -23,19 +23,18 @@ flowchart LR
     F2 -. 同等 .-> H2
     F3 -. 同等 .-> H3
     here --> A["target/macos-arm64/vial-mac-arm64.dmg"]
-    here --> X["target/macos-x86_64/vial-mac-x86_64.dmg"]
 ```
 
 ## アーキテクチャの決まり方
 
 pip の wheel は単一アーキテクチャなので、**ビルドに使う Python 自体のアーキテクチャ**で決まります。
 `build.sh` は `VIAL_ARCH`（未指定なら `uname -m`）と venv の Python のアーキテクチャが一致しているか確認し、
-一致しなければ中断します。arm64 の Mac で x86_64 版を作ることはできません（CI では Intel ランナーを使います）。
+一致しなければ中断します。スクリプト自体は `VIAL_ARCH=x86_64` も受け付けますが、Intel の Python が必要なため
+arm64 の Mac では作れず、CI でも arm64 しかビルドしていません。
 
 | 対象 | ビルド環境 | 生成物 |
 |---|---|---|
 | Apple Silicon | arm64 の Python（M1 以降の Mac、`macos-15` ランナー） | `target/macos-arm64/vial-mac-arm64.dmg` |
-| Intel / AMD64 | x86_64 の Python（Intel Mac、`macos-15-intel` ランナー） | `target/macos-x86_64/vial-mac-x86_64.dmg` |
 
 ## ローカルでのビルド
 
@@ -58,19 +57,17 @@ util/macos/build.sh
 ```mermaid
 flowchart LR
     P["push / pull_request"] --> A["build-mac-arm64<br/>macos-15"]
-    P --> X["build-mac-x86_64<br/>macos-15-intel"]
     A --> AA["Artifact: vial-mac-arm64"]
-    X --> XA["Artifact: vial-mac-x86_64"]
     T["tag v* を push"] --> A
-    T --> X
-    AA --> R["release-mac<br/>GitHub Release に dmg を添付"]
-    XA --> R
+    T --> W["build-win<br/>windows-2025 (x64)"]
+    AA --> R["release<br/>GitHub Release に添付"]
+    W --> R
     R --> L["README の<br/>releases/latest/download リンク"]
 ```
 
-- push と pull request のたびに両アーキテクチャをビルドし、Artifacts に dmg を上げます。
-- `v` で始まるタグ（例: `v0.7.5`）を push すると、ビルド後に `release-mac` ジョブが GitHub Release を作り、
-  両方の dmg を添付します。リポジトリの README にある「最新版のダウンロード」リンクは
+- push と pull request のたびに arm64 版をビルドし、Artifacts に dmg を上げます。
+- `v` で始まるタグ（例: `v0.7.5`）を push すると、ビルド後に `release` ジョブが GitHub Release を作り、
+  macOS の dmg と Windows x64 のインストーラ・zip を添付します（Windows は upstream 由来の fbs ビルドをそのまま使用）。リポジトリの README にある「最新版のダウンロード」リンクは
   `releases/latest/download/<ファイル名>` を指しているので、新しいリリースを作るたびに自動で最新版になります。
 
 リリースの手順:

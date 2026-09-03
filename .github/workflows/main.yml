@@ -17,55 +17,9 @@ jobs:
         name: vial-linux
         path: util/linux-builder/output/Vial-x86_64.AppImage
 
-  build-mac:
+  # Native Apple Silicon build with PyInstaller (see util/macos/README.md). macos-15 runners are arm64.
+  build-mac-arm64:
     runs-on: macos-15
-    env:
-      PYTHON_VERSION: 3.6.8
-      MACOSX_DEPLOYMENT_TARGET: 10.9
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Get Python
-      run: curl https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macosx${MACOSX_DEPLOYMENT_TARGET}.pkg -o "python.pkg"
-
-    - name: Verify download
-      run: shasum -a 256 -c <<< '4bcd53faffc98d193ef7cdccd5668de3829c702af4db45258819a84a2cab60d0 *python.pkg'
-
-    - name: Install Python
-      run: |
-        sudo installer -pkg python.pkg -target /
-
-    - name: Setup venv
-      run: |
-        python3.6 -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-
-    - name: Build
-      run: |
-        source venv/bin/activate
-        fbs freeze
-        hdiutil create -volname Vial -srcfolder "target/Vial.app" -ov -format UDZO vial-mac.dmg
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: vial-mac
-        path: vial-mac.dmg
-
-  # Native macOS builds with PyInstaller (see util/macos/README.md).
-  # macos-15 runners are Apple Silicon, macos-15-intel runners are x86_64.
-  build-mac-native:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - arch: arm64
-          runner: macos-15
-        - arch: x86_64
-          runner: macos-15-intel
-    name: build-mac-${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
 
     steps:
     - uses: actions/checkout@v4
@@ -83,18 +37,18 @@ jobs:
         pip install --no-deps "fbs==0.9.0"
 
     - name: Build
-      run: VIAL_ARCH=${{ matrix.arch }} ./util/macos/build.sh
+      run: VIAL_ARCH=arm64 ./util/macos/build.sh
 
     - uses: actions/upload-artifact@v4
       with:
-        name: vial-mac-${{ matrix.arch }}
-        path: target/macos-${{ matrix.arch }}/vial-mac-${{ matrix.arch }}.dmg
+        name: vial-mac-arm64
+        path: target/macos-arm64/vial-mac-arm64.dmg
 
-  # On a "v*" tag, publish both macOS builds as a GitHub Release so that
+  # On a "v*" tag, publish the macOS (arm64) and Windows (x64) builds as a GitHub Release so that
   # https://github.com/<owner>/<repo>/releases/latest/download/<file> always serves the newest one.
-  release-mac:
+  release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-mac-native
+    needs: [build-mac-arm64, build-win]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -102,15 +56,30 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        pattern: vial-mac-*
+        name: vial-mac-arm64
+        path: release
+
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: vial-win*
         merge-multiple: true
         path: release
 
+    - name: Name the Windows files by architecture
+      run: |
+        mv release/VialSetup.exe release/vial-win-x64-setup.exe
+        mv release/vial-win.zip release/vial-win-x64.zip
+        ls -l release
+
     - uses: softprops/action-gh-release@v2
       with:
-        files: release/*.dmg
+        files: |
+          release/vial-mac-arm64.dmg
+          release/vial-win-x64-setup.exe
+          release/vial-win-x64.zip
         generate_release_notes: true
 
+  # Windows x64 (AMD64) only
   build-win:
     runs-on: windows-2025
 
@@ -119,6 +88,7 @@ jobs:
     - uses: actions/setup-python@v4
       with:
         python-version: '3.6.x'
+        architecture: x64
 
     - name: Setup venv
       run: |
