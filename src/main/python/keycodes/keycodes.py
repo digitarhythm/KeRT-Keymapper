@@ -623,6 +623,9 @@ KEYCODES_MEDIA = [
 
 KEYCODES_TAP_DANCE = []
 
+# Tap dance entries reserved for OS Dance (see editor/os_dance.py): same TD(x) ids, shown as OD(n)
+KEYCODES_OS_DANCE = []
+
 KEYCODES_USER = []
 
 KEYCODES_MACRO = []
@@ -810,7 +813,9 @@ def recreate_keycodes():
     KEYCODES.clear()
     KEYCODES.extend(KEYCODES_SPECIAL + KEYCODES_BASIC + KEYCODES_SHIFTED + KEYCODES_ISO + KEYCODES_LAYERS +
                     KEYCODES_BOOT + KEYCODES_MODIFIERS + KEYCODES_QUANTUM + KEYCODES_BACKLIGHT + KEYCODES_MEDIA +
-                    KEYCODES_TAP_DANCE + KEYCODES_MACRO + KEYCODES_USER + KEYCODES_HIDDEN + KEYCODES_MIDI)
+                    KEYCODES_TAP_DANCE + KEYCODES_MACRO + KEYCODES_USER + KEYCODES_HIDDEN + KEYCODES_MIDI +
+                    # last so that OD(n) wins over the hidden TD(x) placeholders in KEYCODES_MAP
+                    KEYCODES_OS_DANCE)
     KEYCODES_MAP.clear()
     RAWCODES_MAP.clear()
     for keycode in KEYCODES:
@@ -911,9 +916,18 @@ def recreate_keyboard_keycodes(keyboard):
         KEYCODES_MACRO.append(kc)
 
     KEYCODES_TAP_DANCE.clear()
+    KEYCODES_OS_DANCE.clear()
+    os_dance = getattr(keyboard, "os_dance", None)
+    os_base = os_count = 0
+    if isinstance(os_dance, dict) and isinstance(os_dance.get("base"), int) and isinstance(os_dance.get("count"), int):
+        os_base, os_count = os_dance["base"], os_dance["count"]
     for x in range(keyboard.tap_dance_count):
-        lbl = "TD({})".format(x)
-        KEYCODES_TAP_DANCE.append(Keycode(lbl, lbl, "Tap dance keycode"))
+        qmk_id = "TD({})".format(x)
+        if os_base <= x < os_base + os_count:
+            KEYCODES_OS_DANCE.append(Keycode(qmk_id, "OD({})".format(x - os_base),
+                                             "OS Dance keycode (tap dance entry {})".format(x)))
+        else:
+            KEYCODES_TAP_DANCE.append(Keycode(qmk_id, qmk_id, "Tap dance keycode"))
 
     # Check if custom keycodes are defined in keyboard, and if so add them to user keycodes
     if keyboard.custom_keycodes is not None and len(keyboard.custom_keycodes) > 0:

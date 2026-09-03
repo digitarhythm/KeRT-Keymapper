@@ -2,6 +2,8 @@ import lzma
 import os.path
 import struct
 
+import pytest
+
 from PyQt5.QtCore import QPoint
 from PyQt5.QtWidgets import QPushButton
 from pytestqt.qt_compat import qt_api
@@ -192,6 +194,12 @@ all_mw = []
 
 def prepare(qtbot, keyboard_json, combos=None, tap_dance=None):
     import hidraw as hid
+    from PyQt5 import sip
+    from util import KeycodeDisplay
+
+    # qtbot deletes the previous test's MainWindow via deleteLater(); once the event loop has run, its
+    # TabbedKeycodes are gone on the C++ side but still registered here, so drop them before building a new one
+    KeycodeDisplay.clients = [c for c in KeycodeDisplay.clients if not sip.isdeleted(c)]
 
     vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance)
     MockDevice.vk = vk
@@ -604,3 +612,171 @@ def test_tap_dance(qtbot):
     assert not tde.btn_save.isEnabled()
     assert td.tabText(td.currentIndex()) == "2"
     assert timeout_w.value() == 123
+
+
+FAKE_KEYBOARD_OS_DANCE = """
+{
+  "matrix": {
+    "rows": 2,
+    "cols": 2
+  },
+  "layouts": {
+    "keymap": [
+      [
+        "0,0",
+        "0,1"
+      ],
+      [
+        "1,0",
+        "1,1"
+      ]
+    ]
+  },
+  "osDance": {
+    "base": 2,
+    "count": 2
+  }
+}
+"""
+
+
+def find_tab(mw, label):
+    """ Returns the EditorContainer for the main window tab with the given label, or None """
+    for x in range(mw.tabs.count()):
+        if mw.tabs.tabText(x) == label:
+            return mw.tabs.widget(x)
+    return None
+
+
+def test_os_dance_hidden_without_definition(qtbot):
+    """ Without "osDance" in the definition there is no OS Dance tab and Tap Dance shows every entry """
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD, tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)])
+
+    assert find_tab(mw, "OS Dance") is None
+    tde = find_tab(mw, "Tap Dance").editor
+    assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1", "2", "3"]
+
+    # the keycode list has no "OS Dance" tab either
+    ak = mw.tray_keycodes.all_keycodes
+    assert "OS Dance" not in [ak.tabText(x) for x in range(ak.count())]
+
+
+def test_os_dance(qtbot):
+    """ OS Dance reuses tap dance entries base..base+count-1 as (Mac, Windows, Linux, Default) """
+    from PyQt5.QtWidgets import QLabel, QPushButton, QSpinBox
+    from widgets.key_widget import KeyWidget
+
+    # entries 0..1 are regular tap dances, entries 2..3 are OS Dance (base=2, count=2)
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD_OS_DANCE, tap_dance=[
+        [0, 0, 0, 0, 200],
+        [4, 5, 6, 7, 200],
+        [0x14, 0x1A, 0x08, 0x15, 0],    # Q, W, E, R -> Mac, Windows, Linux, Default
+        [0, 0, 0, 0x1B, 500],           # only Default set; tapping term must pass through untouched
+    ])
+    # on macOS the central widget only becomes visible once queued show events are processed
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+
+    # the Tap Dance tab only shows the entries below the OS Dance base
+    tde = find_tab(mw, "Tap Dance").editor
+    assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1"]
+
+    container = find_tab(mw, "OS Dance")
+    assert container is not None, "could not find the OS Dance tab"
+    ode = container.editor
+    od = ode.tabs
+    assert [od.tabText(x) for x in range(od.count())] == ["0", "1"]
+
+    # every keycode change is stored immediately, so there is nothing for Save / Revert to do
+    assert [b.text() for b in container.findChildren(QPushButton) if b.text() in ("Save", "Revert")] == []
+
+    def check_tab(idx, keys, td_idx):
+        od.setCurrentIndex(idx)
+        assert od.tabText(od.currentIndex()) == str(idx)
+        page = od.widget(od.currentIndex())
+
+        w = page.findChildren(KeyWidget)
+        assert len(w) == 4
+        for x in range(4):
+            assert w[x].keycode == keys[x], "unexpected keycode at tab {} position {}: {} vs {}".format(
+                idx, x, w[x].keycode, keys[x])
+
+        # the tapping term is not exposed in the OS Dance UI
+        assert page.findChildren(QSpinBox) == []
+
+        labels = [l.text() for l in page.findChildren(QLabel)]
+        hints = [t for t in labels if "keymap" in t]
+        os_labels = [t for t in labels if "keymap" not in t]
+        assert [t.split(" ")[0] for t in os_labels] == ["Mac", "Windows", "Linux", "Default"]
+
+        # the keymap uses TD(base + idx) directly, shown as OD(idx); there is no dedicated OS Dance keycode
+        assert len(hints) == 1
+        assert "OD({})".format(idx) in hints[0]
+        assert "TD({})".format(td_idx) in hints[0]
+        assert "OSK" not in hints[0]
+
+    check_tab(0, ["KC_Q", "KC_W", "KC_E", "KC_R"], 2)
+    check_tab(1, ["KC_NO", "KC_NO", "KC_NO", "KC_X"], 3)
+
+    # still on tab 1: set the Mac keycode to "A"
+    assert not mw.tray_keycodes.isVisible()
+    w = od.widget(od.currentIndex()).findChildren(KeyWidget)
+    bbox = w[0].widgets[0].bbox
+    # click at the centre of the key so the hit test is robust to fractional bbox coordinates
+    pos = QPoint(int(sum(p.x() for p in bbox) / len(bbox)), int(sum(p.y() for p in bbox) / len(bbox)))
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
+    assert mw.tray_keycodes.isVisible()
+
+    # in the keycode list the OS Dance entries live in their own "OS Dance" tab as OD(n),
+    # and the "Tap Dance" tab only keeps the entries below the OS Dance base
+    ak = mw.tray_keycodes.all_keycodes
+    tray_tabs = {ak.tabText(x): x for x in range(ak.count())}
+    assert "Tap Dance" in tray_tabs and "OS Dance" in tray_tabs
+    assert tray_tabs["OS Dance"] == tray_tabs["Tap Dance"] + 1
+
+    ak.setCurrentIndex(tray_tabs["Tap Dance"])
+    for text in ["TD(0)", "TD(1)"]:
+        assert find_key_btn(mw.tray_keycodes, text) is not None
+    for text in ["TD(2)", "TD(3)", "OD(0)", "OD(1)"]:
+        with pytest.raises(RuntimeError):
+            find_key_btn(mw.tray_keycodes, text)
+
+    ak.setCurrentIndex(tray_tabs["OS Dance"])
+    for text in ["OD(0)", "OD(1)"]:
+        assert find_key_btn(mw.tray_keycodes, text) is not None
+    for text in ["TD(0)", "TD(1)", "TD(2)", "TD(3)"]:
+        with pytest.raises(RuntimeError):
+            find_key_btn(mw.tray_keycodes, text)
+
+    ak.setCurrentIndex(0)
+    assert ak.tabText(ak.currentIndex()) == "Basic"
+
+    qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "A"), qt_api.QtCore.Qt.MouseButton.LeftButton)
+
+    # written straight to tap dance entry base + 1 = 3, with the tapping term preserved
+    assert vk.tap_dance[3] == (4, 0, 0, 0x1B, 500)
+    # neighbours are untouched
+    assert vk.tap_dance[2] == [0x14, 0x1A, 0x08, 0x15, 0]
+    assert vk.tap_dance[1] == [4, 5, 6, 7, 200]
+    # nothing is pending, so no "*" marker on the tab
+    assert od.tabText(od.currentIndex()) == "1"
+
+
+def test_os_dance_count_clamped(qtbot):
+    """ A count larger than the available entries is clamped instead of hiding the tab """
+    fake = FAKE_KEYBOARD_OS_DANCE.replace('"count": 2', '"count": 50')
+    mw, vk = prepare(qtbot, fake, tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)])
+
+    container = find_tab(mw, "OS Dance")
+    assert container is not None, "OS Dance tab must not disappear when count is too large"
+    od = container.editor.tabs
+    assert [od.tabText(x) for x in range(od.count())] == ["0", "1"]
+
+
+def test_os_dance_base_out_of_range(qtbot):
+    """ A base at or beyond the tap dance count leaves nothing to show, so the tab is hidden """
+    fake = FAKE_KEYBOARD_OS_DANCE.replace('"base": 2', '"base": 4')
+    mw, vk = prepare(qtbot, fake, tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)])
+
+    assert find_tab(mw, "OS Dance") is None
+    tde = find_tab(mw, "Tap Dance").editor
+    assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1", "2", "3"]

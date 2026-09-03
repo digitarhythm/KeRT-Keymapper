@@ -27,6 +27,7 @@ from editor.qmk_settings import QmkSettings
 from editor.rgb_configurator import RGBConfigurator
 from tabbed_keycodes import TabbedKeycodes
 from editor.tap_dance import TapDance
+from editor.os_dance import OSDance
 from unlocker import Unlocker
 from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
 from vial_device import VialKeyboard
@@ -78,6 +79,7 @@ class MainWindow(QMainWindow):
         self.firmware_flasher = FirmwareFlasher(self)
         self.macro_recorder = MacroRecorder()
         self.tap_dance = TapDance()
+        self.os_dance = OSDance()
         self.combos = Combos()
         self.key_override = KeyOverride()
         self.alt_repeat_key = AltRepeatKey()
@@ -87,8 +89,8 @@ class MainWindow(QMainWindow):
         self.rgb_configurator = RGBConfigurator()
 
         self.editors = [(self.keymap_editor, "Keymap"), (self.layout_editor, "Layout"), (self.macro_recorder, "Macros"),
-                        (self.rgb_configurator, "Lighting"), (self.tap_dance, "Tap Dance"), (self.combos, "Combos"),
-                        (self.key_override, "Key Overrides"), (self.alt_repeat_key, "Alt Repeat Key"),
+                        (self.rgb_configurator, "Lighting"), (self.tap_dance, "Tap Dance"), (self.os_dance, "OS Dance"),
+                        (self.combos, "Combos"), (self.key_override, "Key Overrides"), (self.alt_repeat_key, "Alt Repeat Key"),
                         (self.qmk_settings, "QMK Settings"), (self.matrix_tester, "Matrix tester"),
                         (self.firmware_flasher, "Firmware updater")]
 
@@ -337,7 +339,7 @@ class MainWindow(QMainWindow):
             self.autorefresh.current_device.keyboard.reload()
 
         for e in [self.layout_editor, self.keymap_editor, self.firmware_flasher, self.macro_recorder,
-                  self.tap_dance, self.combos, self.key_override, self.alt_repeat_key,
+                  self.tap_dance, self.os_dance, self.combos, self.key_override, self.alt_repeat_key,
                   self.qmk_settings, self.matrix_tester, self.rgb_configurator]:
             e.rebuild(self.autorefresh.current_device)
 

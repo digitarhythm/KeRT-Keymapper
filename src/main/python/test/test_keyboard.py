@@ -15,6 +15,10 @@ LAYOUT_ENCODER = r"""
 """
 
 
+LAYOUT_OS_DANCE = """
+{"name":"test","vendorId":"0x0000","productId":"0x1111","lighting":"none","matrix":{"rows":2,"cols":2},"layouts":{"keymap":[["0,0","0,1"],["1,0","1,1"]]},"osDance":{"base":2,"count":2}}
+"""
+
 def s(kc):
     return Keycode.serialize(kc)
 
@@ -194,3 +198,14 @@ class TestKeyboard(unittest.TestCase):
         dev.expect("FE040100010020", "")
         kb.set_encoder(1, 0, 1, Keycode.serialize(0x20))
         self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(0x20))
+
+    def test_os_dance_definition(self):
+        """ Tests that "osDance" from the definition is exposed as keyboard.os_dance (None when absent) """
+
+        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]]])
+        self.assertIsNone(kb.os_dance)
+        dev.finish()
+
+        kb, dev = self.prepare_keyboard(LAYOUT_OS_DANCE, [[[1, 2], [3, 4]]])
+        self.assertEqual(kb.os_dance, {"base": 2, "count": 2})
+        dev.finish()

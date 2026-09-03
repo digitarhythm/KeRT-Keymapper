@@ -53,6 +53,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.encoders = []
         self.vibl = False
         self.custom_keycodes = None
+        self.os_dance = None
         self.midi = None
 
         self.lighting_qmk_rgblight = self.lighting_qmk_backlight = self.lighting_vialrgb = False
@@ -158,6 +159,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.cols = payload["matrix"]["cols"]
 
         self.custom_keycodes = payload.get("customKeycodes", None)
+        self.os_dance = payload.get("osDance", None)
 
         serial = KleSerial()
         kb = serial.deserialize(payload["layouts"]["keymap"])
