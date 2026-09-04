@@ -42,28 +42,27 @@ class TestKeycode(unittest.TestCase):
     def test_serialize_v6(self):
         self._test_serialize_protocol(6)
 
-    def test_os_dance_labels(self):
-        """ Tap dance entries reserved for OS Dance move to KEYCODES_OS_DANCE as OD(n), keeping their TD(x) id """
+    def test_os_dance_keycodes(self):
+        """ OSD(n) keycodes exist only for the entries the firmware reports and map to 0x7E20 + n """
         kb = FakeKeyboard(6)
         kb.tap_dance_count = 4
-        kb.os_dance = {"base": 2, "count": 2}
+        kb.os_dance_count = 3
         recreate_keyboard_keycodes(kb)
 
-        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_TAP_DANCE], [("TD(0)", "TD(0)"), ("TD(1)", "TD(1)")])
-        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_OS_DANCE], [("TD(2)", "OD(0)"), ("TD(3)", "OD(1)")])
-
-        # labels resolve through the global keycode map (what the keymap and the tray display)
-        self.assertEqual(Keycode.label("TD(1)"), "TD(1)")
-        self.assertEqual(Keycode.label("TD(2)"), "OD(0)")
-        self.assertEqual(Keycode.label("TD(3)"), "OD(1)")
-        # the tooltip still tells the user which tap dance entry is behind the label
-        self.assertIn("TD(2)", Keycode.tooltip("TD(2)"))
-        # the wire format is untouched: OD(n) is only a label
-        self.assertEqual(Keycode.serialize(Keycode.deserialize("TD(2)")), "TD(2)")
-
-        # without osDance every entry stays a plain tap dance
-        kb.os_dance = None
-        recreate_keyboard_keycodes(kb)
+        # tap dance is unaffected by OS Dance
         self.assertEqual([k.qmk_id for k in KEYCODES_TAP_DANCE], ["TD(0)", "TD(1)", "TD(2)", "TD(3)"])
+        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_OS_DANCE],
+                         [("OSD(0)", "OSD(0)"), ("OSD(1)", "OSD(1)"), ("OSD(2)", "OSD(2)")])
+
+        # wire format: QK_OS_DANCE = 0x7E20
+        self.assertEqual(Keycode.deserialize("OSD(0)"), 0x7E20)
+        self.assertEqual(Keycode.deserialize("OSD(2)"), 0x7E22)
+        self.assertEqual(Keycode.serialize(0x7E21), "OSD(1)")
+        self.assertEqual(Keycode.label("OSD(1)"), "OSD(1)")
+        self.assertIn("OS Dance", Keycode.tooltip("OSD(1)"))
+
+        # a keyboard without OS Dance lists nothing
+        kb.os_dance_count = 0
+        recreate_keyboard_keycodes(kb)
         self.assertEqual(KEYCODES_OS_DANCE, [])
-        self.assertEqual(Keycode.label("TD(2)"), "TD(2)")
+        self.assertEqual([k.qmk_id for k in KEYCODES_TAP_DANCE], ["TD(0)", "TD(1)", "TD(2)", "TD(3)"])

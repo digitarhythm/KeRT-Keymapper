@@ -199,13 +199,12 @@ class TestKeyboard(unittest.TestCase):
         kb.set_encoder(1, 0, 1, Keycode.serialize(0x20))
         self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(0x20))
 
-    def test_os_dance_definition(self):
-        """ Tests that "osDance" from the definition is exposed as keyboard.os_dance (None when absent) """
-
-        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]]])
-        self.assertIsNone(kb.os_dance)
-        dev.finish()
+    def test_os_dance_definition_ignored(self):
+        """ The legacy "osDance" definition key is not used any more: support is announced by the firmware """
 
         kb, dev = self.prepare_keyboard(LAYOUT_OS_DANCE, [[[1, 2], [3, 4]]])
-        self.assertEqual(kb.os_dance, {"base": 2, "count": 2})
+        self.assertFalse(hasattr(kb, "os_dance"))
+        # no dynamic entries on this (vial protocol 0) keyboard, so there is nothing to show
+        self.assertEqual(kb.os_dance_count, 0)
+        self.assertEqual(kb.os_dance_entries, [])
         dev.finish()

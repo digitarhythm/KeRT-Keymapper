@@ -20,6 +20,7 @@ from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_GET_KEYBOAR
 from protocol.dynamic import ProtocolDynamic
 from protocol.key_override import ProtocolKeyOverride
 from protocol.macro import ProtocolMacro
+from protocol.os_dance import ProtocolOSDance
 from protocol.tap_dance import ProtocolTapDance
 from unlocker import Unlocker
 from util import MSG_LEN, hid_send
@@ -32,7 +33,8 @@ class ProtocolError(Exception):
     pass
 
 
-class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, ProtocolKeyOverride, ProtocolAltRepeatKey):
+class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, ProtocolKeyOverride, ProtocolAltRepeatKey,
+               ProtocolOSDance):
     """ Low-level communication with a vial-enabled keyboard """
 
     def __init__(self, dev, usb_send=hid_send):
@@ -53,7 +55,6 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.encoders = []
         self.vibl = False
         self.custom_keycodes = None
-        self.os_dance = None
         self.midi = None
 
         self.lighting_qmk_rgblight = self.lighting_qmk_backlight = self.lighting_vialrgb = False
@@ -98,6 +99,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.reload_combo()
         self.reload_key_override()
         self.reload_alt_repeat_key()
+        self.reload_os_dance()
 
     def reload_layers(self):
         """ Get how many layers the keyboard has """
@@ -159,7 +161,6 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.cols = payload["matrix"]["cols"]
 
         self.custom_keycodes = payload.get("customKeycodes", None)
-        self.os_dance = payload.get("osDance", None)
 
         serial = KleSerial()
         kb = serial.deserialize(payload["layouts"]["keymap"])
@@ -404,6 +405,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         data["combo"] = self.save_combo()
         data["key_override"] = self.save_key_override()
         data["alt_repeat_key"] = self.save_alt_repeat_key()
+        data["os_dance"] = self.save_os_dance()
         data["settings"] = self.settings
 
         return json.dumps(data).encode("utf-8")
@@ -433,6 +435,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.restore_combo(data.get("combo", []))
         self.restore_key_override(data.get("key_override", []))
         self.restore_alt_repeat_key(data.get("alt_repeat_key", []))
+        self.restore_os_dance(data.get("os_dance", []))
 
         for qsid, value in data.get("settings", dict()).items():
             from editor.qmk_settings import QmkSettings
