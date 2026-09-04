@@ -127,14 +127,7 @@ class TapDance(BasicEditor):
     def rebuild_ui(self):
         while self.tabs.count() > 0:
             self.tabs.removeTab(0)
-
-        # OS Dance reuses the tail end of the tap dance entries, starting at os_dance["base"],
-        # so only show the entries below that boundary here
-        count = self.keyboard.tap_dance_count
-        if getattr(self.keyboard, "os_dance", None):
-            count = min(count, self.keyboard.os_dance["base"])
-        self.tap_dance_entries = self.tap_dance_entries_available[:count]
-
+        self.tap_dance_entries = self.tap_dance_entries_available[:self.keyboard.tap_dance_count]
         for x, e in enumerate(self.tap_dance_entries):
             self.tabs.addTab(e.widget(), str(x))
         self.reload_ui()

@@ -607,6 +607,10 @@ for x in range(16):
 for x in range(64):
     keycodes_v6.kc["USER{:02}".format(x)] = keycodes_v6.kc["QK_KB"] + x
 
+# OS Dance: QK_OS_DANCE = 0x7E20, the unused tail of the QK_KB range (below QK_USER / SAFE_RANGE)
+for x in range(32):
+    keycodes_v6.kc["OSD({})".format(x)] = 0x7E20 + x
+
 for name, val in keycodes_v6.kc.items():
     if name.endswith("(kc)"):
         keycodes_v6.masked.add(val)
