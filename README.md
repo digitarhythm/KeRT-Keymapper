@@ -14,46 +14,39 @@ sends `LGUI(KC_C)` on macOS and `LCTL(KC_C)` on Windows and Linux without switch
 
 ### How it works
 
-OS Dance does not add a new keycode type. The keyboard reserves a range of its tap dance entries
-and the firmware reinterprets each of those entries as a per-OS table:
+Each OS Dance entry is a small per-OS table stored in its own EEPROM area on the keyboard
+and referenced from the keymap with the `OSD(n)` keycode:
 
-| Tap dance field | OS Dance meaning |
-|---|---|
-| On tap | macOS (and iOS) |
-| On hold | Windows |
-| On double tap | Linux (and ChromeOS) |
-| On tap + hold | Default: used when the OS is unknown, or when the matching field above is empty |
-| Tapping term | unused |
+| Field | Sent when the host is | Empty field falls back to |
+|---|---|---|
+| macOS | macOS | Default |
+| Windows | Windows | Default |
+| Linux (ChromeOS) | Linux or ChromeOS | Default |
+| iOS | iOS / iPadOS | macOS, then Default |
+| Default | unknown OS | nothing is sent |
 
-When the key is pressed, the firmware looks up the detected OS, picks the matching field and sends it.
-An empty field (`KC_NO` or `KC_TRNS`) falls back to Default; if Default is empty too, nothing is sent.
+A field is empty when it is `KC_NO` (Vial writes `KC_TRNS` as `KC_NO` too).
+Unlike tap dance there is no timing involved: `OSD(n)` resolves to the chosen keycode as soon as
+the key is pressed, so mod-taps and layer-taps placed in a field behave exactly as if they were in
+the keymap directly.
 
 ### Keyboard requirements
 
-- Firmware built with `OS_DETECTION_ENABLE = yes` and the OS Dance handling for the reserved
-  tap dance entries (see the `trek/lettio` keyboard in the companion vial-qmk fork for a reference).
-- An `osDance` key in the keyboard's `vial.json` telling Vial which entries are reserved:
-
-```json
-"osDance": { "base": 24, "count": 8 }
-```
-
-With `VIAL_TAP_DANCE_ENTRIES = 32` this reserves `TD(24)`–`TD(31)` as `OD(0)`–`OD(7)`.
-The GUI must match the firmware: `base` and `count` are read from the definition, so keep them in sync
-with the firmware's constants. Keyboards without `osDance` are unaffected and show no OS Dance tab.
+The firmware has to be built from the companion vial-qmk fork with OS Dance enabled
+(`OS_DETECTION_ENABLE = yes` plus the OS Dance library; see `quantum/os_dance/docs/` there).
+Such a firmware announces the feature and the number of entries to Vial, so nothing needs to be
+added to the keyboard's `vial.json`. Keyboards without OS Dance simply show no OS Dance tab.
 
 ### Using it in Vial
 
 1. Open the **OS Dance** tab (next to **Tap Dance**). Each sub-tab `0`, `1`, ... is one OS Dance entry.
-2. Fill in the keycodes for **Mac (iOS)**, **Windows**, **Linux (ChromeOS)** and **Default**.
-   Changes are written to the keyboard immediately, like tap dance keycodes.
-3. In the **Keymap** tab, pick the key and choose `OD(n)` from the **OS Dance** tab of the keycode list.
-   `OD(n)` is stored on the keyboard as `TD(base + n)`; the tooltip shows which tap dance entry it is.
+2. Fill in the keycodes for **macOS**, **Windows**, **Linux (ChromeOS)**, **iOS** and **Default**.
+   Changes are written to the keyboard immediately, like combos.
+3. In the **Keymap** tab, pick the key and choose `OSD(n)` from the **OS Dance** tab of the keycode list.
+   `OSD(n)` can also be used inside other features (tap dance fields, key overrides, ...).
 
-The **Tap Dance** tab only shows the entries below `base`, so regular tap dances and OS Dance never
-overlap. Because the reserved entries are ordinary tap dance storage, OS Dance settings are included in
-**File → Save current layout** and restored with **Load saved layout**.
-
+OS Dance entries are included in **File → Save current layout** (as the `os_dance` array of the `.vil`
+file) and restored with **Load saved layout**. Layout files from before this feature leave the entries unchanged.
 
 ![](https://get.vial.today/img/vial-win-1.png)
 
