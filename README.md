@@ -6,47 +6,49 @@
 
 Vial is an open-source cross-platform (Windows, Linux and Mac) GUI and a QMK fork for configuring your keyboard in real time.
 
-## OS Dance (this fork)
+## HostOS (this fork)
 
-OS Dance lets one key send a different keycode depending on the operating system the keyboard is
+HostOS lets one key send a different keycode depending on the operating system the keyboard is
 plugged into, detected by QMK's `OS_DETECTION_ENABLE`. A typical use is a single "copy" key that
 sends `LGUI(KC_C)` on macOS and `LCTL(KC_C)` on Windows and Linux without switching layers.
 
 ### How it works
 
-Each OS Dance entry is a small per-OS table stored in its own EEPROM area on the keyboard
-and referenced from the keymap with the `OSD(n)` keycode:
+HostOS keys are stored in ordinary Vial tap dance slots: the firmware reserves the **last N tap
+dance slots** and reads their four fields as a per-OS table. Nothing in the Vial protocol, the
+EEPROM layout or the `.vil` file format changes.
 
-| Field | Sent when the host is | Empty field falls back to |
-|---|---|---|
-| macOS | macOS | Default |
-| Windows | Windows | Default |
-| Linux (ChromeOS) | Linux or ChromeOS | Default |
-| iOS | iOS / iPadOS | macOS, then Default |
-| Default | unknown OS | nothing is sent |
+| Tap dance field | HostOS field | Sent when the host is | Empty field falls back to |
+|---|---|---|---|
+| On tap | Mac | macOS, iOS | Default |
+| On hold | Win | Windows | Default |
+| On double tap | Linux | Linux, ChromeOS | Default |
+| On tap + hold | Default | unknown OS | nothing is sent |
+| Tapping term | (hidden) | used by the firmware as a "seeded" marker | |
 
-A field is empty when it is `KC_NO` (Vial writes `KC_TRNS` as `KC_NO` too).
-Unlike tap dance there is no timing involved: `OSD(n)` resolves to the chosen keycode as soon as
-the key is pressed, so mod-taps and layer-taps placed in a field behave exactly as if they were in
-the keymap directly.
+A field is empty when it is `KC_NO` (Vial writes `KC_TRNS` as `KC_NO` too). There is no timing
+involved: `HOS(n)` resolves to the chosen keycode as soon as the key is pressed, so mod-taps and
+layer-taps placed in a field behave exactly as if they were in the keymap directly.
 
 ### Keyboard requirements
 
-The firmware has to be built from the companion vial-qmk fork with OS Dance enabled
-(`OS_DETECTION_ENABLE = yes` plus the OS Dance library; see `quantum/os_dance/docs/` there).
-Such a firmware announces the feature and the number of entries to Vial, so nothing needs to be
-added to the keyboard's `vial.json`. Keyboards without OS Dance simply show no OS Dance tab.
+The firmware has to be built from the companion vial-qmk fork with `HOST_OS_ENABLE = yes`
+(and optionally `HOST_OS_COUNT`, default 16); see `quantum/host_os/docs/` there. The build adds
+`"hostOS": {"count": N}` to the keyboard definition, which is how Vial learns how many slots are
+reserved. Keyboards without it simply show no HostOS tab.
 
 ### Using it in Vial
 
-1. Open the **OS Dance** tab (next to **Tap Dance**). Each sub-tab `0`, `1`, ... is one OS Dance entry.
-2. Fill in the keycodes for **macOS**, **Windows**, **Linux (ChromeOS)**, **iOS** and **Default**.
-   Changes are written to the keyboard immediately, like combos.
-3. In the **Keymap** tab, pick the key and choose `OSD(n)` from the **OS Dance** tab of the keycode list.
-   `OSD(n)` can also be used inside other features (tap dance fields, key overrides, ...).
+1. Open the **HostOS** tab (next to **Tap Dance**). Each sub-tab `0`, `1`, ... is one HostOS key.
+2. Fill in the keycodes for **Mac**, **Win**, **Linux** and **Default**. Changes are written to the
+   keyboard immediately, like tap dance keycodes.
+3. In the **Keymap** tab, pick the key and choose `HOS(n)` from the **HostOS** tab of the keycode list.
+   `HOS(n)` is the same keycode as `TD(base + n)` (base = number of tap dance slots minus N); a stock
+   Vial shows the same key as `TD(base + n)` and the reserved slots in its Tap Dance tab.
 
-OS Dance entries are included in **File → Save current layout** (as the `os_dance` array of the `.vil`
-file) and restored with **Load saved layout**. Layout files from before this feature leave the entries unchanged.
+The **Tap Dance** tab only shows the slots below the reserved range, so regular tap dances and HostOS
+never overlap. HostOS settings are part of the `tap_dance` section of **File → Save current layout**
+and are restored with **Load saved layout**.
 
 ![](https://get.vial.today/img/vial-win-1.png)
 
@@ -60,7 +62,7 @@ Visit https://get.vial.today/ to download a binary release of upstream Vial.
 
 #### Download (this fork)
 
-This fork adds the **OS Dance** editor (tap dance entries that send a different keycode per host OS).
+This fork adds the **HostOS** editor (tap dance slots that send a different keycode per host OS).
 Latest release:
 
 | Platform | Download |
