@@ -623,8 +623,8 @@ KEYCODES_MEDIA = [
 
 KEYCODES_TAP_DANCE = []
 
-# OS Dance keycodes OSD(n), created per keyboard from the entry count it reports (see editor/os_dance.py)
-KEYCODES_OS_DANCE = []
+# HostOS keys: the last host_os_count tap dance slots, shown as HOS(n) (see editor/host_os.py)
+KEYCODES_HOST_OS = []
 
 KEYCODES_USER = []
 
@@ -814,8 +814,8 @@ def recreate_keycodes():
     KEYCODES.extend(KEYCODES_SPECIAL + KEYCODES_BASIC + KEYCODES_SHIFTED + KEYCODES_ISO + KEYCODES_LAYERS +
                     KEYCODES_BOOT + KEYCODES_MODIFIERS + KEYCODES_QUANTUM + KEYCODES_BACKLIGHT + KEYCODES_MEDIA +
                     KEYCODES_TAP_DANCE + KEYCODES_MACRO + KEYCODES_USER + KEYCODES_HIDDEN + KEYCODES_MIDI +
-                    # last: OSD(n) shares 0x7E20..0x7E3F with USER32..USER63, so it must win in RAWCODES_MAP
-                    KEYCODES_OS_DANCE)
+                    # last so that the HOS(n) labels win over the hidden TD(x) placeholders in KEYCODES_MAP
+                    KEYCODES_HOST_OS)
     KEYCODES_MAP.clear()
     RAWCODES_MAP.clear()
     for keycode in KEYCODES:
@@ -915,15 +915,21 @@ def recreate_keyboard_keycodes(keyboard):
     for x, kc in enumerate(KEYCODES_MACRO_BASE):
         KEYCODES_MACRO.append(kc)
 
+    # HostOS reuses the last host_os_count tap dance slots: those keep their TD(x) id (wire and .vil
+    # format) but are listed and labelled as HOS(n), and "HOS(n)" is accepted as a spelling of TD(base+n)
+    host_os_count = getattr(keyboard, "host_os_count", 0)
+    host_os_base = getattr(keyboard, "host_os_base", keyboard.tap_dance_count)
     KEYCODES_TAP_DANCE.clear()
-    for x in range(keyboard.tap_dance_count):
+    for x in range(host_os_base):
         lbl = "TD({})".format(x)
         KEYCODES_TAP_DANCE.append(Keycode(lbl, lbl, "Tap dance keycode"))
-
-    KEYCODES_OS_DANCE.clear()
-    for x in range(min(getattr(keyboard, "os_dance_count", 0), 32)):
-        lbl = "OSD({})".format(x)
-        KEYCODES_OS_DANCE.append(Keycode(lbl, lbl, "OS Dance keycode"))
+    KEYCODES_HOST_OS.clear()
+    for x in range(host_os_count):
+        qmk_id = "TD({})".format(host_os_base + x)
+        alias = "HOS({})".format(x)
+        kc = Keycode(qmk_id, alias, "HostOS key {} (tap dance slot {})".format(x, host_os_base + x), alias=[alias])
+        Keycode.qmk_id_to_keycode[alias] = kc
+        KEYCODES_HOST_OS.append(kc)
 
     # Check if custom keycodes are defined in keyboard, and if so add them to user keycodes
     if keyboard.custom_keycodes is not None and len(keyboard.custom_keycodes) > 0:

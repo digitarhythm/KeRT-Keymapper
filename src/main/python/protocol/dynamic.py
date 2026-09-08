@@ -19,8 +19,6 @@ class ProtocolDynamic(BaseProtocol):
             self.key_override_count = 0
             self.key_override_entries = []
             self.alt_repeat_key_count = 0
-            self.os_dance_count = 0
-            self.os_dance_entries = []
             return
         data = self.usb_send(self.dev, struct.pack("BBB", CMD_VIA_VIAL_PREFIX, CMD_VIAL_DYNAMIC_ENTRY_OP,
                                                    DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES), retries=20)
@@ -33,14 +31,10 @@ class ProtocolDynamic(BaseProtocol):
         for bit_index, feature in [
             (0, "caps_word"),
             (1, "layer_lock"),
-            (2, "os_dance"),
             # Add more feature bits as needed...
         ]:
             if data[-1] & (1 << bit_index):
                 self.supported_features.add(feature)
-
-        # data[4] is only meaningful on firmware that announces OS Dance through the feature bit
-        self.os_dance_count = data[4] if "os_dance" in self.supported_features else 0
 
         if self.vial_protocol >= VIAL_PROTOCOL_KEY_OVERRIDE:
             # Persistent Default Layers isn't present in older QMK builds, but is
