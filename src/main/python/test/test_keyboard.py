@@ -15,8 +15,12 @@ LAYOUT_ENCODER = r"""
 """
 
 
-LAYOUT_OS_DANCE = """
-{"name":"test","vendorId":"0x0000","productId":"0x1111","lighting":"none","matrix":{"rows":2,"cols":2},"layouts":{"keymap":[["0,0","0,1"],["1,0","1,1"]]},"osDance":{"base":2,"count":2}}
+LAYOUT_HOST_OS = """
+{"name":"test","vendorId":"0x0000","productId":"0x1111","lighting":"none","matrix":{"rows":2,"cols":2},"layouts":{"keymap":[["0,0","0,1"],["1,0","1,1"]]},"hostOS":{"count":2}}
+"""
+
+LAYOUT_HOST_OS_BAD = """
+{"name":"test","vendorId":"0x0000","productId":"0x1111","lighting":"none","matrix":{"rows":2,"cols":2},"layouts":{"keymap":[["0,0","0,1"],["1,0","1,1"]]},"hostOS":{"count":"two"}}
 """
 
 def s(kc):
@@ -199,12 +203,22 @@ class TestKeyboard(unittest.TestCase):
         kb.set_encoder(1, 0, 1, Keycode.serialize(0x20))
         self.assertEqual(kb.encoder_layout[(1, 0, 1)], Keycode.serialize(0x20))
 
-    def test_os_dance_definition_ignored(self):
-        """ The legacy "osDance" definition key is not used any more: support is announced by the firmware """
+    def test_host_os_definition(self):
+        """ "hostOS": {"count": N} in the definition reserves the last N tap dance slots for HostOS """
 
-        kb, dev = self.prepare_keyboard(LAYOUT_OS_DANCE, [[[1, 2], [3, 4]]])
-        self.assertFalse(hasattr(kb, "os_dance"))
-        # no dynamic entries on this (vial protocol 0) keyboard, so there is nothing to show
-        self.assertEqual(kb.os_dance_count, 0)
-        self.assertEqual(kb.os_dance_entries, [])
+        kb, dev = self.prepare_keyboard(LAYOUT_2x2, [[[1, 2], [3, 4]]])
+        self.assertEqual(kb.host_os_requested, 0)
+        self.assertEqual(kb.host_os_count, 0)
+        dev.finish()
+
+        kb, dev = self.prepare_keyboard(LAYOUT_HOST_OS, [[[1, 2], [3, 4]]])
+        self.assertEqual(kb.host_os_requested, 2)
+        # this (vial protocol 0) keyboard has no tap dance slots, so nothing can be reserved
+        self.assertEqual(kb.tap_dance_count, 0)
+        self.assertEqual(kb.host_os_count, 0)
+        self.assertEqual(kb.host_os_base, 0)
+        dev.finish()
+
+        kb, dev = self.prepare_keyboard(LAYOUT_HOST_OS_BAD, [[[1, 2], [3, 4]]])
+        self.assertEqual(kb.host_os_requested, 0)
         dev.finish()

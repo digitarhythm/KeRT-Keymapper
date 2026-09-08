@@ -16,7 +16,7 @@ from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_VIAL_PREFIX
     CMD_VIA_MACRO_GET_BUFFER_SIZE, CMD_VIAL_QMK_SETTINGS_QUERY, CMD_VIAL_DYNAMIC_ENTRY_OP, \
     DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES, CMD_VIA_KEYMAP_GET_BUFFER, CMD_VIA_MACRO_GET_BUFFER, CMD_VIAL_GET_UNLOCK_STATUS, \
     CMD_VIA_SET_KEYCODE, DYNAMIC_VIAL_COMBO_GET, DYNAMIC_VIAL_COMBO_SET, DYNAMIC_VIAL_TAP_DANCE_GET, \
-    DYNAMIC_VIAL_TAP_DANCE_SET, DYNAMIC_VIAL_OS_DANCE_GET, DYNAMIC_VIAL_OS_DANCE_SET
+    DYNAMIC_VIAL_TAP_DANCE_SET
 from widgets.square_button import SquareButton
 
 FAKE_KEYBOARD = """
@@ -56,16 +56,11 @@ def mock_enumerate():
 
 class VirtualKeyboard:
 
-    def __init__(self, kbjson, combos=None, tap_dance=None, os_dance=None, os_dance_flag=True):
+    def __init__(self, kbjson, combos=None, tap_dance=None):
         if combos is None:
             combos = []
         if tap_dance is None:
             tap_dance = []
-        # os_dance: list of [macos, windows, linux, ios, default] keycodes, or None for a firmware without OS Dance.
-        # os_dance_flag=False emulates a firmware that reports a count in msg[4] without the feature bit.
-        self.os_dance_supported = os_dance is not None and os_dance_flag
-        if os_dance is None:
-            os_dance = []
 
         self.keyboard_definition = lzma.compress(kbjson.encode("utf-8"))
 
@@ -83,7 +78,6 @@ class VirtualKeyboard:
 
         self.combos = combos
         self.tap_dance = tap_dance
-        self.os_dance = os_dance
 
         self.key_override_entries = 0
         self.alt_repeat_key_entries = 0
@@ -98,15 +92,12 @@ class VirtualKeyboard:
 
     def vial_cmd_dynamic(self, msg):
         if msg[2] == DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES:
-            response = struct.pack("BBBBB", len(self.tap_dance), len(self.combos),
-                                   self.key_override_entries, self.alt_repeat_key_entries, len(self.os_dance))
+            response = struct.pack("BBBB", len(self.tap_dance), len(self.combos),
+                                   self.key_override_entries, self.alt_repeat_key_entries)
             # Zero pad to 31 bytes.
             response += (31 - len(response)) * b'\0'
-            # Set last two bits, indicating Caps Word and Layer Lock; bit2 announces OS Dance.
-            features = 0b00000011
-            if self.os_dance_supported:
-                features |= 0b00000100
-            response += features.to_bytes(1, "little")
+            # Set last two bits, indicating Caps Word and Layer Lock.
+            response += (0b00000011).to_bytes(1, "little")
             return response
         elif msg[2] == DYNAMIC_VIAL_COMBO_GET:
             idx = msg[3]
@@ -128,17 +119,6 @@ class VirtualKeyboard:
             assert idx < len(self.tap_dance)
             self.tap_dance[idx] = values
             return b""
-        elif msg[2] == DYNAMIC_VIAL_OS_DANCE_GET:
-            idx = msg[3]
-            if idx >= len(self.os_dance):
-                return struct.pack("B", 1)
-            return struct.pack("<BHHHHH", 0, *self.os_dance[idx])
-        elif msg[2] == DYNAMIC_VIAL_OS_DANCE_SET:
-            idx = msg[3]
-            if idx >= len(self.os_dance):
-                return struct.pack("B", 1)
-            self.os_dance[idx] = struct.unpack_from("<HHHHH", msg[4:])
-            return struct.pack("B", 0)
         raise RuntimeError("unsupported dynamic submsg 0x{:02X}".format(msg[2]))
 
     def vial_cmd(self, msg):
@@ -213,7 +193,7 @@ class FakeAppctx:
 all_mw = []
 
 
-def prepare(qtbot, keyboard_json, combos=None, tap_dance=None, os_dance=None, os_dance_flag=True):
+def prepare(qtbot, keyboard_json, combos=None, tap_dance=None):
     import hidraw as hid
     from PyQt5 import sip
     from util import KeycodeDisplay
@@ -222,7 +202,7 @@ def prepare(qtbot, keyboard_json, combos=None, tap_dance=None, os_dance=None, os
     # TabbedKeycodes are gone on the C++ side but still registered here, so drop them before building a new one
     KeycodeDisplay.clients = [c for c in KeycodeDisplay.clients if not sip.isdeleted(c)]
 
-    vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance, os_dance=os_dance, os_dance_flag=os_dance_flag)
+    vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance)
     MockDevice.vk = vk
 
     hid.enumerate = mock_enumerate
@@ -635,6 +615,33 @@ def test_tap_dance(qtbot):
     assert timeout_w.value() == 123
 
 
+FAKE_KEYBOARD_HOST_OS = """
+{
+  "matrix": {
+    "rows": 2,
+    "cols": 2
+  },
+  "layouts": {
+    "keymap": [
+      [
+        "0,0",
+        "0,1"
+      ],
+      [
+        "1,0",
+        "1,1"
+      ]
+    ]
+  },
+  "hostOS": {
+    "count": 2
+  }
+}
+"""
+
+HOST_OS_MARKER = 0x4F53
+
+
 def find_tab(mw, label):
     """ Returns the EditorContainer for the main window tab with the given label, or None """
     for x in range(mw.tabs.count()):
@@ -648,145 +655,138 @@ def tray_tab_names(mw):
     return [ak.tabText(x) for x in range(ak.count())]
 
 
-def test_os_dance_hidden_without_firmware_support(qtbot):
-    """ Without feature bit2 there is no OS Dance tab, even if msg[4] reports entries; Tap Dance is untouched """
-    mw, vk = prepare(qtbot, FAKE_KEYBOARD, tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)],
-                     os_dance=[[0, 0, 0, 0, 0] for _ in range(3)], os_dance_flag=False)
+def test_host_os_hidden_without_definition(qtbot):
+    """ Without "hostOS" in the definition there is no HostOS tab and Tap Dance shows every slot """
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD, tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)])
 
-    assert find_tab(mw, "OS Dance") is None
-    assert "OS Dance" not in tray_tab_names(mw)
+    assert find_tab(mw, "HostOS") is None
+    assert "HostOS" not in tray_tab_names(mw)
     kb = mw.autorefresh.current_device.keyboard
-    assert kb.os_dance_count == 0
-    assert "os_dance" not in kb.supported_features
+    assert kb.host_os_count == 0
 
     tde = find_tab(mw, "Tap Dance").editor
     assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1", "2", "3"]
 
 
-def test_os_dance(qtbot):
-    """ OS Dance entries are their own dynamic entries: (macOS, Windows, Linux, iOS, Default), keyed by OSD(n) """
+def test_host_os(qtbot):
+    """ The last hostOS.count tap dance slots are edited as (Mac, Win, Linux, Default) and keyed by HOS(n) """
     import json
     from PyQt5.QtWidgets import QLabel, QPushButton, QSpinBox
     from widgets.key_widget import KeyWidget
 
-    mw, vk = prepare(qtbot, FAKE_KEYBOARD, tap_dance=[[0, 0, 0, 0, 200], [4, 5, 6, 7, 200]], os_dance=[
-        [0x14, 0x1A, 0x08, 0x15, 0x17],   # Q, W, E, R, T -> macOS, Windows, Linux, iOS, Default
-        [0, 0, 0, 0, 0x1B],               # only Default set (X)
-        [0, 0, 0, 0, 0],
+    # 4 tap dance slots, hostOS.count = 2: slots 0..1 are tap dances, slots 2..3 are HostOS 0..1
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD_HOST_OS, tap_dance=[
+        [0, 0, 0, 0, 200],
+        [4, 5, 6, 7, 200],
+        [0x14, 0x1A, 0x08, 0x15, HOST_OS_MARKER],   # Q, W, E, R -> Mac, Win, Linux, Default (seeded marker)
+        [0, 0, 0, 0x1B, 500],                       # only Default set (X); marker not yet written
     ])
     # on macOS the central widget only becomes visible once queued show events are processed
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     kb = mw.autorefresh.current_device.keyboard
-    assert kb.os_dance_count == 3
-    assert "os_dance" in kb.supported_features
+    assert (kb.tap_dance_count, kb.host_os_count, kb.host_os_base) == (4, 2, 2)
 
-    # Tap Dance keeps all of its entries; OS Dance sits right after it
+    # Tap Dance keeps only the slots below base; HostOS sits right after it
     main_tabs = [mw.tabs.tabText(x) for x in range(mw.tabs.count())]
-    assert main_tabs.index("OS Dance") == main_tabs.index("Tap Dance") + 1
+    assert main_tabs.index("HostOS") == main_tabs.index("Tap Dance") + 1
     tde = find_tab(mw, "Tap Dance").editor
     assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1"]
 
-    container = find_tab(mw, "OS Dance")
-    assert container is not None, "could not find the OS Dance tab"
-    od = container.editor.tabs
-    assert [od.tabText(x) for x in range(od.count())] == ["0", "1", "2"]
+    container = find_tab(mw, "HostOS")
+    assert container is not None, "could not find the HostOS tab"
+    ho = container.editor.tabs
+    assert [ho.tabText(x) for x in range(ho.count())] == ["0", "1"]
 
     # every keycode change is stored immediately, so there is nothing for Save / Revert to do
     assert [b.text() for b in container.findChildren(QPushButton) if b.text() in ("Save", "Revert")] == []
 
     def check_tab(idx, keys):
-        od.setCurrentIndex(idx)
-        assert od.tabText(od.currentIndex()) == str(idx)
-        page = od.widget(od.currentIndex())
+        ho.setCurrentIndex(idx)
+        assert ho.tabText(ho.currentIndex()) == str(idx)
+        page = ho.widget(ho.currentIndex())
 
         w = page.findChildren(KeyWidget)
-        assert len(w) == 5
-        for x in range(5):
+        assert len(w) == 4
+        for x in range(4):
             assert w[x].keycode == keys[x], "unexpected keycode at tab {} position {}: {} vs {}".format(
                 idx, x, w[x].keycode, keys[x])
+        # the marker / tapping term is not exposed
         assert page.findChildren(QSpinBox) == []
 
         labels = [l.text() for l in page.findChildren(QLabel)]
         hints = [t for t in labels if "keymap" in t]
-        field_labels = [t for t in labels if "keymap" not in t]
-        assert [t.split(" ")[0] for t in field_labels] == ["macOS", "Windows", "Linux", "iOS", "Default"]
+        assert [t for t in labels if "keymap" not in t] == ["Mac", "Win", "Linux", "Default"]
 
         assert len(hints) == 1
-        assert "OSD({})".format(idx) in hints[0]
-        assert "TD(" not in hints[0]
+        assert "HOS({})".format(idx) in hints[0]
+        assert "TD({})".format(2 + idx) in hints[0]
 
-    check_tab(0, ["KC_Q", "KC_W", "KC_E", "KC_R", "KC_T"])
-    check_tab(1, ["KC_NO", "KC_NO", "KC_NO", "KC_NO", "KC_X"])
-    check_tab(2, ["KC_NO"] * 5)
+    check_tab(0, ["KC_Q", "KC_W", "KC_E", "KC_R"])
+    check_tab(1, ["KC_NO", "KC_NO", "KC_NO", "KC_X"])
 
-    # still on tab 2: set the macOS keycode to "A"
+    # still on tab 1: set the Mac keycode to "A"
     assert not mw.tray_keycodes.isVisible()
-    w = od.widget(od.currentIndex()).findChildren(KeyWidget)
+    w = ho.widget(ho.currentIndex()).findChildren(KeyWidget)
     bbox = w[0].widgets[0].bbox
     pos = QPoint(int(sum(p.x() for p in bbox) / len(bbox)), int(sum(p.y() for p in bbox) / len(bbox)))
     qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
     assert mw.tray_keycodes.isVisible()
 
-    # the keycode list has an "OS Dance" tab with OSD(n) right after "Tap Dance", which only has TD(n)
+    # the keycode list has a "HostOS" tab with HOS(n) right after "Tap Dance", which only has TD(0..base-1)
     ak = mw.tray_keycodes.all_keycodes
     tray_tabs = {ak.tabText(x): x for x in range(ak.count())}
-    assert tray_tabs["OS Dance"] == tray_tabs["Tap Dance"] + 1
+    assert tray_tabs["HostOS"] == tray_tabs["Tap Dance"] + 1
     ak.setCurrentIndex(tray_tabs["Tap Dance"])
     for text in ["TD(0)", "TD(1)"]:
         assert find_key_btn(mw.tray_keycodes, text) is not None
-    with pytest.raises(RuntimeError):
-        find_key_btn(mw.tray_keycodes, "OSD(0)")
-    ak.setCurrentIndex(tray_tabs["OS Dance"])
-    for text in ["OSD(0)", "OSD(1)", "OSD(2)"]:
+    for text in ["TD(2)", "TD(3)", "HOS(0)"]:
+        with pytest.raises(RuntimeError):
+            find_key_btn(mw.tray_keycodes, text)
+    ak.setCurrentIndex(tray_tabs["HostOS"])
+    for text in ["HOS(0)", "HOS(1)"]:
         assert find_key_btn(mw.tray_keycodes, text) is not None
     with pytest.raises(RuntimeError):
-        find_key_btn(mw.tray_keycodes, "OSD(3)")
+        find_key_btn(mw.tray_keycodes, "TD(2)")
     ak.setCurrentIndex(0)
     assert ak.tabText(ak.currentIndex()) == "Basic"
 
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "A"), qt_api.QtCore.Qt.MouseButton.LeftButton)
 
-    # written straight to OS Dance entry 2; neighbours and tap dance untouched
-    assert vk.os_dance[2] == (4, 0, 0, 0, 0)
-    assert vk.os_dance[1] == [0, 0, 0, 0, 0x1B]
+    # written straight to tap dance slot base + 1 = 3, with the seeded marker in the fifth field
+    assert vk.tap_dance[3] == (4, 0, 0, 0x1B, HOST_OS_MARKER)
+    assert vk.tap_dance[2] == [0x14, 0x1A, 0x08, 0x15, HOST_OS_MARKER]
     assert vk.tap_dance[1] == [4, 5, 6, 7, 200]
-    assert od.tabText(od.currentIndex()) == "2"
+    assert ho.tabText(ho.currentIndex()) == "1"
 
-    # an OSD(n) keycode round-trips through the keymap wire format
-    assert Keycode.deserialize("OSD(2)") == 0x7E22
-    assert Keycode.serialize(0x7E22) == "OSD(2)"
+    # HOS(n) is only a spelling of TD(base + n)
+    assert Keycode.deserialize("HOS(1)") == Keycode.deserialize("TD(3)")
+    assert Keycode.label("TD(3)") == "HOS(1)"
+    assert Keycode.serialize(Keycode.deserialize("HOS(1)")) == "TD(3)"
 
     # KC_TRNS means "empty": it is written as KC_NO and the UI is synced to what was actually stored
-    od.setCurrentIndex(1)
-    fields = od.widget(1).findChildren(KeyWidget)
-    fields[1].set_keycode("KC_A")       # Windows
-    fields[3].set_keycode("KC_TRNS")    # iOS -> stored as KC_NO
-    assert vk.os_dance[1] == (0, 4, 0, 0, 0x1B)
-    assert kb.os_dance_get(1) == ("KC_NO", "KC_A", "KC_NO", "KC_NO", "KC_X")
-    assert [k.keycode for k in fields] == ["KC_NO", "KC_A", "KC_NO", "KC_NO", "KC_X"]
+    fields = ho.widget(1).findChildren(KeyWidget)
+    fields[1].set_keycode("KC_B")       # Win
+    fields[2].set_keycode("KC_TRNS")    # Linux -> stored as KC_NO
+    assert vk.tap_dance[3] == (4, 5, 0, 0x1B, HOST_OS_MARKER)
+    assert kb.tap_dance_get(3) == ("KC_A", "KC_B", "KC_NO", "KC_X", HOST_OS_MARKER)
+    assert [k.keycode for k in fields] == ["KC_A", "KC_B", "KC_NO", "KC_X"]
 
-    # .vil: saved as an "os_dance" array of serialized keycodes, restored through os_dance_set
+    # .vil: unchanged format, the HostOS slots are simply the last entries of "tap_dance"
     layout = json.loads(kb.save_layout())
-    assert layout["os_dance"] == [
-        ["KC_Q", "KC_W", "KC_E", "KC_R", "KC_T"],
-        ["KC_NO", "KC_A", "KC_NO", "KC_NO", "KC_X"],
-        ["KC_A", "KC_NO", "KC_NO", "KC_NO", "KC_NO"],
-    ]
-    kb.restore_os_dance([["KC_B"] * 5, ["KC_NO"] * 5, ["KC_NO"] * 5, ["KC_C"] * 5])   # 4th entry: ignored
-    assert vk.os_dance[0] == (5, 5, 5, 5, 5)
-    assert vk.os_dance[1] == (0, 0, 0, 0, 0)
-    assert vk.os_dance[2] == (0, 0, 0, 0, 0)
-    # a layout file without "os_dance" (older .vil) leaves the entries alone
-    kb.restore_os_dance([])
-    assert vk.os_dance[0] == (5, 5, 5, 5, 5)
+    assert layout["tap_dance"][2] == ["KC_Q", "KC_W", "KC_E", "KC_R", HOST_OS_MARKER]
+    assert layout["tap_dance"][3] == ["KC_A", "KC_B", "KC_NO", "KC_X", HOST_OS_MARKER]
 
 
-def test_os_dance_count_clamped(qtbot):
-    """ The editor shows at most 32 entries even if the firmware reports more """
-    mw, vk = prepare(qtbot, FAKE_KEYBOARD, os_dance=[[0, 0, 0, 0, 0] for _ in range(40)])
+def test_host_os_count_clamped(qtbot):
+    """ A count larger than the tap dance slot count is clamped: every slot becomes HostOS """
+    fake = FAKE_KEYBOARD_HOST_OS.replace('"count": 2', '"count": 50')
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD_HOST_OS.replace('"count": 2', '"count": 50'),
+                     tap_dance=[[0, 0, 0, 0, 200] for _ in range(4)])
 
-    container = find_tab(mw, "OS Dance")
+    kb = mw.autorefresh.current_device.keyboard
+    assert (kb.host_os_count, kb.host_os_base) == (4, 0)
+    container = find_tab(mw, "HostOS")
     assert container is not None
-    od = container.editor.tabs
-    assert od.count() == 32
-    assert [od.tabText(x) for x in (0, 31)] == ["0", "31"]
+    assert [container.editor.tabs.tabText(x) for x in range(container.editor.tabs.count())] == ["0", "1", "2", "3"]
+    tde = find_tab(mw, "Tap Dance").editor
+    assert tde.tabs.count() == 0

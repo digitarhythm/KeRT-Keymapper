@@ -1,6 +1,6 @@
 import unittest
 
-from keycodes.keycodes import Keycode, recreate_keyboard_keycodes, KEYCODES_TAP_DANCE, KEYCODES_OS_DANCE
+from keycodes.keycodes import Keycode, recreate_keyboard_keycodes, KEYCODES_TAP_DANCE, KEYCODES_HOST_OS
 
 
 class FakeKeyboard:
@@ -42,27 +42,32 @@ class TestKeycode(unittest.TestCase):
     def test_serialize_v6(self):
         self._test_serialize_protocol(6)
 
-    def test_os_dance_keycodes(self):
-        """ OSD(n) keycodes exist only for the entries the firmware reports and map to 0x7E20 + n """
+    def test_host_os_keycodes(self):
+        """ The last host_os_count tap dance slots are shown as HOS(n) while keeping their TD(x) id """
         kb = FakeKeyboard(6)
         kb.tap_dance_count = 4
-        kb.os_dance_count = 3
+        kb.host_os_count = 2
+        kb.host_os_base = 2
         recreate_keyboard_keycodes(kb)
 
-        # tap dance is unaffected by OS Dance
-        self.assertEqual([k.qmk_id for k in KEYCODES_TAP_DANCE], ["TD(0)", "TD(1)", "TD(2)", "TD(3)"])
-        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_OS_DANCE],
-                         [("OSD(0)", "OSD(0)"), ("OSD(1)", "OSD(1)"), ("OSD(2)", "OSD(2)")])
+        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_TAP_DANCE], [("TD(0)", "TD(0)"), ("TD(1)", "TD(1)")])
+        self.assertEqual([(k.qmk_id, k.label) for k in KEYCODES_HOST_OS], [("TD(2)", "HOS(0)"), ("TD(3)", "HOS(1)")])
 
-        # wire format: QK_OS_DANCE = 0x7E20
-        self.assertEqual(Keycode.deserialize("OSD(0)"), 0x7E20)
-        self.assertEqual(Keycode.deserialize("OSD(2)"), 0x7E22)
-        self.assertEqual(Keycode.serialize(0x7E21), "OSD(1)")
-        self.assertEqual(Keycode.label("OSD(1)"), "OSD(1)")
-        self.assertIn("OS Dance", Keycode.tooltip("OSD(1)"))
+        # what the keymap and the picker display
+        self.assertEqual(Keycode.label("TD(1)"), "TD(1)")
+        self.assertEqual(Keycode.label("TD(2)"), "HOS(0)")
+        self.assertEqual(Keycode.label("TD(3)"), "HOS(1)")
+        self.assertIn("TD(2)", Keycode.tooltip("TD(2)"))
 
-        # a keyboard without OS Dance lists nothing
-        kb.os_dance_count = 0
+        # both spellings resolve to the same tap dance keycode; the wire / .vil spelling stays TD(x)
+        self.assertEqual(Keycode.deserialize("HOS(1)"), Keycode.deserialize("TD(3)"))
+        self.assertEqual(Keycode.deserialize("HOS(1)"), Keycode.resolve("QK_TAP_DANCE") + 3)
+        self.assertEqual(Keycode.serialize(Keycode.deserialize("HOS(1)")), "TD(3)")
+
+        # without HostOS every slot stays a plain tap dance
+        kb.host_os_count = 0
+        kb.host_os_base = 4
         recreate_keyboard_keycodes(kb)
-        self.assertEqual(KEYCODES_OS_DANCE, [])
         self.assertEqual([k.qmk_id for k in KEYCODES_TAP_DANCE], ["TD(0)", "TD(1)", "TD(2)", "TD(3)"])
+        self.assertEqual(KEYCODES_HOST_OS, [])
+        self.assertEqual(Keycode.label("TD(2)"), "TD(2)")

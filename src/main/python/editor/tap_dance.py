@@ -127,7 +127,9 @@ class TapDance(BasicEditor):
     def rebuild_ui(self):
         while self.tabs.count() > 0:
             self.tabs.removeTab(0)
-        self.tap_dance_entries = self.tap_dance_entries_available[:self.keyboard.tap_dance_count]
+        # the last host_os_count slots are HostOS keys and are edited in the HostOS tab instead
+        count = self.keyboard.tap_dance_count - getattr(self.keyboard, "host_os_count", 0)
+        self.tap_dance_entries = self.tap_dance_entries_available[:count]
         for x, e in enumerate(self.tap_dance_entries):
             self.tabs.addTab(e.widget(), str(x))
         self.reload_ui()
