@@ -107,11 +107,21 @@ jobs:
     # frozen app and aborts when they are not on the PATH. The runner images of 2026-09 no longer ship
     # them and the download.microsoft.com package upstream used does not install them any more, so take
     # both redistributables from Chocolatey.
+    # Pinned package versions; the packages download Microsoft's own installers and verify their SHA256.
+    # The DLLs end up inside the shipped app, so additionally require them to carry a valid Microsoft
+    # Authenticode signature before continuing.
     - name: Install Visual C++ 2010 and 2012 Redistributables
       run: |
-        choco install vcredist2010 vcredist2012 -y --no-progress
+        choco install vcredist2010 --version 10.0.40219.32503 -y --no-progress
+        choco install vcredist2012 --version 11.0.61031.20230518 -y --no-progress
         foreach ($dll in "msvcr100.dll", "msvcr110.dll", "msvcp110.dll") {
-          if (-not (Test-Path "$env:SystemRoot\System32\$dll")) { throw "$dll still missing" }
+          $path = "$env:SystemRoot\System32\$dll"
+          if (-not (Test-Path $path)) { throw "$dll still missing" }
+          $sig = Get-AuthenticodeSignature $path
+          if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+            throw "$dll is not validly signed by Microsoft ($($sig.Status); $($sig.SignerCertificate.Subject))"
+          }
+          Write-Host "$dll ok: signed by $($sig.SignerCertificate.Subject)"
         }
 
     - name: Build
