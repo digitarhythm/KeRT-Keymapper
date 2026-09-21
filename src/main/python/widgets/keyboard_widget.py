@@ -8,6 +8,7 @@ from constants import KEY_SIZE_RATIO, KEY_SPACING_RATIO, KEYBOARD_WIDGET_PADDING
     KEYBOARD_WIDGET_MASK_HEIGHT, KEY_ROUNDNESS, SHADOW_SIDE_PADDING, SHADOW_TOP_PADDING, SHADOW_BOTTOM_PADDING, \
     KEYBOARD_WIDGET_NONMASK_PADDING
 from themes import Theme
+import key_style
 
 
 class KeyWidget:
@@ -77,9 +78,11 @@ class KeyWidget:
             self.polygon = QPolygonF(self.bbox + [self.bbox[0]])
             self.polygon2 = QPolygonF(self.bbox2 + [self.bbox2[0]])
             self.polygon = self.polygon.united(self.polygon2)
-            self.corner = self.size * KEY_ROUNDNESS
+            self.corner = key_style.CORNER_RADIUS if key_style.FLAT_KEYS else self.size * KEY_ROUNDNESS
+            if key_style.FLAT_KEYS:
+                self.text_rect = QRect(self.rect)
             self.background_draw_path = self.calculate_background_draw_path()
-            self.foreground_draw_path = self.calculate_foreground_draw_path()
+            self.foreground_draw_path = QPainterPath() if key_style.FLAT_KEYS else self.calculate_foreground_draw_path()
             self.extra_draw_path = self.calculate_extra_draw_path()
 
             # calculate areas where the inner keycode will be located
@@ -386,6 +389,12 @@ class KeyboardWidget(QWidget):
         active_pen.setColor(QApplication.palette().color(QPalette.Highlight))
         active_pen.setWidthF(1.5)
 
+        # flat keys get a thin outline so a white key stands out on a light background
+        outline_pen = qp.pen()
+        outline_pen.setColor(QApplication.palette().color(QPalette.Mid))
+        outline_pen.setWidthF(key_style.OUTLINE_WIDTH)
+        inactive_pen = outline_pen if key_style.FLAT_KEYS else Qt.NoPen
+
         # for the encoder arrow
         extra_pen = regular_pen
         extra_brush = QBrush()
@@ -409,6 +418,13 @@ class KeyboardWidget(QWidget):
         foreground_on_brush.setColor(QApplication.palette().color(QPalette.Highlight).darker(120))
         foreground_on_brush.setStyle(Qt.SolidPattern)
 
+        # flat keys: the selected key is filled with the highlight colour and its legend inverted
+        selected_brush = QBrush()
+        selected_brush.setColor(QApplication.palette().color(QPalette.Highlight))
+        selected_brush.setStyle(Qt.SolidPattern)
+        selected_text_pen = qp.pen()
+        selected_text_pen.setColor(QApplication.palette().color(QPalette.HighlightedText))
+
         mask_font = qp.font()
         mask_font.setPointSize(round(mask_font.pointSize() * 0.8))
 
@@ -423,15 +439,19 @@ class KeyboardWidget(QWidget):
 
             active = key.active or (self.active_key == key and not self.active_mask)
 
-            # draw keycap background/drop-shadow
-            qp.setPen(active_pen if active else Qt.NoPen)
+            # draw keycap background/drop-shadow (or the whole flat key)
+            qp.setPen(active_pen if active else inactive_pen)
             brush = background_brush
             if key.pressed:
                 brush = background_pressed_brush
             elif key.on:
                 brush = background_on_brush
+            elif active and key_style.FLAT_KEYS:
+                brush = selected_brush
             qp.setBrush(brush)
             qp.drawPath(key.background_draw_path)
+            legend_pen = selected_text_pen if (active and key_style.FLAT_KEYS and not key.pressed and not key.on) \
+                else regular_pen
 
             # draw keycap foreground
             qp.setPen(Qt.NoPen)
@@ -447,20 +467,21 @@ class KeyboardWidget(QWidget):
             if key.masked:
                 # draw the outer legend
                 qp.setFont(mask_font)
-                qp.setPen(key.color if key.color else regular_pen)
+                qp.setPen(key.color if key.color else legend_pen)
                 qp.drawText(key.nonmask_rect, Qt.AlignCenter, key.text)
 
                 # draw the inner highlight rect
-                qp.setPen(active_pen if self.active_key == key and self.active_mask else Qt.NoPen)
+                qp.setPen(active_pen if self.active_key == key and self.active_mask else inactive_pen)
                 qp.setBrush(mask_brush)
-                qp.drawRoundedRect(key.mask_rect, key.corner, key.corner)
+                mask_corner = key.corner * 0.6 if key_style.FLAT_KEYS else key.corner
+                qp.drawRoundedRect(key.mask_rect, mask_corner, mask_corner)
 
                 # draw the inner legend
                 qp.setPen(key.mask_color if key.mask_color else regular_pen)
                 qp.drawText(key.mask_rect, Qt.AlignCenter, key.mask_text)
             else:
                 # draw the legend
-                qp.setPen(key.color if key.color else regular_pen)
+                qp.setPen(key.color if key.color else legend_pen)
                 qp.drawText(key.text_rect, Qt.AlignCenter, key.text)
 
             # draw the extra shape (encoder arrow)

@@ -17,6 +17,7 @@ from fbs_runtime.application_context.PyQt5 import ApplicationContext
 import sys
 
 from main_window import MainWindow
+import branding_theme
 
 
 # http://timlehr.com/python-exception-hooks-with-qt-message-box/
@@ -84,6 +85,7 @@ if __name__ == '__main__':
         appctxt = VialApplicationContext()       # 1. Instantiate ApplicationContext
         init_logger()
         qt_exception_hook = UncaughtHook()
+        branding_theme.register()
         window = MainWindow(appctxt)
         window.show()
         exit_code = appctxt.app.exec_()      # 2. Invoke appctxt.app.exec_()

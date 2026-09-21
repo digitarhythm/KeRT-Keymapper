@@ -4,7 +4,10 @@ KEY_SIZE_RATIO = 3.2
 KEY_SPACING_RATIO = 0.2
 KEY_ROUNDNESS = 0.08
 
-KEYCODE_BTN_RATIO = 3
+KEYCODE_BTN_RATIO = 3.4
+
+# keycode picker buttons use a font this many points smaller than the default, so long labels fit
+PICKER_FONT_DELTA = -2
 
 WINDOW_WIDTH, WINDOW_HEIGHT = 1024, 768
 

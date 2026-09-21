@@ -3,9 +3,10 @@ import logging
 import platform
 from json import JSONDecodeError
 
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QSettings, QStandardPaths, QTimer, QRect, QT_VERSION_STR
 from PyQt5.QtWidgets import QWidget, QComboBox, QToolButton, QHBoxLayout, QVBoxLayout, QMainWindow, QAction, qApp, \
-    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel
+    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QSizePolicy
 
 import os
 import sys
@@ -34,6 +35,11 @@ from vial_device import VialKeyboard
 from editor.matrix_test import MatrixTest
 
 import themes
+import branding_theme
+
+
+# inner margin of the header row (keyboard selector), in pixels
+HEADER_MARGIN = 6
 
 
 class MainWindow(QMainWindow):
@@ -59,20 +65,55 @@ class MainWindow(QMainWindow):
         if self.settings.value("maximized", False, bool):
             self.showMaximized()
 
+        branding_theme.register()
         themes.Theme.set_theme(self.get_theme())
 
         self.combobox_devices = QComboBox()
+        # the keyboard selector is the first thing to read: a larger font and twice the usual height
+        font = self.combobox_devices.font()
+        font.setPointSize(font.pointSize() + 4)
+        self.combobox_devices.setFont(font)
+        self.combobox_devices.setMinimumHeight(2 * QComboBox().sizeHint().height())
+        # as wide as the longest keyboard name, no wider
+        self.combobox_devices.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.combobox_devices.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.combobox_devices.currentIndexChanged.connect(self.on_device_selected)
 
         self.btn_refresh_devices = QToolButton()
         self.btn_refresh_devices.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self.btn_refresh_devices.setText(tr("MainWindow", "Refresh"))
         self.btn_refresh_devices.clicked.connect(self.on_click_refresh)
+        # same font and height as the keyboard selector; as wide as its text needs
+        self.btn_refresh_devices.setFont(self.combobox_devices.font())
+        self.btn_refresh_devices.setFixedHeight(self.combobox_devices.minimumHeight())
+
+        # keyboard icon in front of the selector, scaled to the selector's height
+        self.lbl_select_keyboard = QLabel()
+        icon_pixmap = QPixmap(appctx.get_resource("keyboard-icon.png"))
+        if not icon_pixmap.isNull():
+            self.lbl_select_keyboard.setPixmap(icon_pixmap.scaledToHeight(
+                self.combobox_devices.minimumHeight(), Qt.SmoothTransformation))
+        self.lbl_select_keyboard.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.lbl_select_keyboard.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+
+        # logo image at the left of the header, scaled to the selector's height
+        self.lbl_logo_image = QLabel()
+        logo_pixmap = QPixmap(appctx.get_resource("kert-mapper.png"))
+        if not logo_pixmap.isNull():
+            self.lbl_logo_image.setPixmap(logo_pixmap.scaledToHeight(
+                self.combobox_devices.minimumHeight(), Qt.SmoothTransformation))
+        self.lbl_logo_image.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         layout_combobox = QHBoxLayout()
-        layout_combobox.addWidget(self.combobox_devices)
+        layout_combobox.setContentsMargins(HEADER_MARGIN, HEADER_MARGIN, HEADER_MARGIN, HEADER_MARGIN)
+        self.layout_header = layout_combobox
+        layout_combobox.addWidget(self.lbl_select_keyboard, 0)
+        layout_combobox.addSpacing(6)
+        layout_combobox.addWidget(self.lbl_logo_image, 0)
+        layout_combobox.addStretch(1)   # icon and logo at the left, selector and Refresh at the right
+        layout_combobox.addWidget(self.combobox_devices, 0)
         if sys.platform != "emscripten":
-            layout_combobox.addWidget(self.btn_refresh_devices)
+            layout_combobox.addWidget(self.btn_refresh_devices, 0)
 
         self.layout_editor = LayoutEditor()
         self.keymap_editor = KeymapEditor(self.layout_editor)
@@ -234,6 +275,8 @@ class MainWindow(QMainWindow):
             # check "System" if nothing else is selected
             if theme_group.checkedAction() is None:
                 theme_group.actions()[0].setChecked(True)
+            # this fork ships a single theme, so there is nothing to choose from
+            self.theme_menu.menuAction().setVisible(False)
 
         about_vial_act = QAction(tr("MenuAbout", "About Vial..."), self)
         about_vial_act.triggered.connect(self.about_vial)
@@ -416,7 +459,8 @@ class MainWindow(QMainWindow):
         KeycodeDisplay.set_keymap_override(KEYMAPS[index][1])
 
     def get_theme(self):
-        return self.settings.value("theme", "Dark")
+        # a theme saved before the rebranding (an upstream name) falls back to this fork's default
+        return branding_theme.resolve_theme(self.settings.value("theme", None))
 
     def set_theme(self, theme):
         themes.Theme.set_theme(theme)

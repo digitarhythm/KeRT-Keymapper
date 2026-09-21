@@ -236,3 +236,7 @@ class KeycodeDisplay:
                 label = widget.keycode.label
                 widget.setStyleSheet("QPushButton {}")
             widget.setText(label.replace("&", "&&"))
+            if hasattr(widget, "set_entry"):
+                widget.set_entry(getattr(widget.keycode, "title_extra", ""), getattr(widget.keycode, "rows", []),
+                                 getattr(widget.keycode, "lines", []))
+                widget.setToolTip(Keycode.tooltip(widget.keycode.qmk_id))

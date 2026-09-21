@@ -13,6 +13,7 @@ from unlocker import Unlocker
 from util import tr
 from vial_device import VialKeyboard
 from widgets.tab_widget_keycodes import TabWidgetWithKeycodes
+import entry_labels
 
 
 class MacroRecorder(BasicEditor):
@@ -178,4 +179,5 @@ class MacroRecorder(BasicEditor):
     def on_save(self):
         Unlocker.unlock(self.device.keyboard)
         self.keyboard.set_macro(self.serialize())
+        entry_labels.update(self.keyboard)   # macro cards in the keycode pickers
         self.on_change()

@@ -9,10 +9,14 @@ from protocol.constants import VIAL_PROTOCOL_DYNAMIC
 from widgets.key_widget import KeyWidget
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
-from widgets.tab_widget_keycodes import TabWidgetWithKeycodes
+from widgets.entry_card import EntryCard, EntryCardContainer
+import entry_labels
 
 # 事前生成するエントリUIの上限
 MAX_HOST_OS_ENTRIES = 32
+
+# キーの描画倍率。カード内では通常より小さく描いて行間を詰める
+CARD_KEY_SCALE = 0.7
 
 # Tap Dance エントリの 5 番目 (custom_tapping_term) に書く「シード済み」マーカー ("OS")。
 # ファームウェアは、4 欄がすべて空でこのマーカーが無いスロットにだけ起動時に既定値を書き込む。
@@ -46,37 +50,25 @@ class HostOSEntryUI(QObject):
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
         l = QVBoxLayout()
-        l.addStretch()
-        l.addSpacing(10)
+        l.setContentsMargins(0, 0, 0, 0)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
-        l.addSpacing(10)
-        self.lbl_hint = QLabel()
-        l.addWidget(self.lbl_hint)
-        l.setAlignment(self.lbl_hint, QtCore.Qt.AlignHCenter)
-        l.addStretch()
         self.w2 = QWidget()
         self.w2.setLayout(l)
-        self.update_hint()
 
     def populate_container(self):
+        self.container.setVerticalSpacing(3)
         self.kc_fields = []
         for row, label in enumerate(["Mac", "Win", "Linux", "Default"]):
             self.container.addWidget(QLabel(label), row, 0)
             kc = KeyWidget()
+            kc.set_scale(CARD_KEY_SCALE)
             kc.changed.connect(self.on_key_changed)
             self.container.addWidget(kc, row, 1)
             self.kc_fields.append(kc)
 
     def set_td_idx(self, td_idx):
         self.td_idx = td_idx
-        self.update_hint()
-
-    def update_hint(self):
-        stored = "?" if self.td_idx is None else self.td_idx
-        self.lbl_hint.setText(
-            "Use <code>HOS({})</code> (HostOS tab) to place this key in the keymap."
-            " Stored as <code>TD({})</code>. Leave a field empty to fall back to Default.".format(self.idx, stored))
 
     def widget(self):
         return self.w2
@@ -106,13 +98,21 @@ class HostOS(BasicEditor):
 
         self.host_os_entries = []
         self.host_os_entries_available = []
-        self.tabs = TabWidgetWithKeycodes()
+        self.cards_available = []
+        self.cards = []
+        self.container = EntryCardContainer()
         for x in range(MAX_HOST_OS_ENTRIES):
             entry = HostOSEntryUI(x)
             entry.key_changed.connect(partial(self.on_key_changed, x))
             self.host_os_entries_available.append(entry)
+            card = EntryCard(entry.widget())
+            card.set_title("HOS({})".format(x))
+            self.cards_available.append(card)
 
-        self.addWidget(self.tabs)
+        self.hint = QLabel()
+        self.hint.setWordWrap(True)
+        self.addWidget(self.hint)
+        self.addWidget(self.container)
 
     # NOTE: BasicEditor is a QVBoxLayout, so method names here must not shadow QLayout's own
     # virtual methods (e.g. count()) which Qt calls from C++ while the layout is being reparented.
@@ -120,13 +120,16 @@ class HostOS(BasicEditor):
         return self.keyboard.host_os_base
 
     def rebuild_ui(self):
-        while self.tabs.count() > 0:
-            self.tabs.removeTab(0)
         shown = min(self.keyboard.host_os_count, MAX_HOST_OS_ENTRIES)
         self.host_os_entries = self.host_os_entries_available[:shown]
+        self.cards = self.cards_available[:shown]
         for x, e in enumerate(self.host_os_entries):
             e.set_td_idx(self.host_os_base() + x)
-            self.tabs.addTab(e.widget(), str(x))
+            self.cards[x].set_title("HOS({})".format(x))
+        self.hint.setText(
+            "Use <code>HOS(n)</code> (HostOS tab) to place a HostOS key in the keymap."
+            " Leave a field empty to fall back to Default.")
+        self.container.set_cards(self.cards)
         self.reload_ui()
 
     def reload_ui(self):
@@ -152,3 +155,4 @@ class HostOS(BasicEditor):
         self.keyboard.tap_dance_set(self.host_os_base() + x, e.save())
         # 書き込んだ値（KC_TRNS -> KC_NO の正規化後）を表示に反映する
         e.load(self.keyboard.tap_dance_get(self.host_os_base() + x))
+        entry_labels.update(self.keyboard)

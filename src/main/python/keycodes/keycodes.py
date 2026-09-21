@@ -813,9 +813,10 @@ def recreate_keycodes():
     KEYCODES.clear()
     KEYCODES.extend(KEYCODES_SPECIAL + KEYCODES_BASIC + KEYCODES_SHIFTED + KEYCODES_ISO + KEYCODES_LAYERS +
                     KEYCODES_BOOT + KEYCODES_MODIFIERS + KEYCODES_QUANTUM + KEYCODES_BACKLIGHT + KEYCODES_MEDIA +
-                    KEYCODES_TAP_DANCE + KEYCODES_MACRO + KEYCODES_USER + KEYCODES_HIDDEN + KEYCODES_MIDI +
-                    # last so that the HOS(n) labels win over the hidden TD(x) placeholders in KEYCODES_MAP
-                    KEYCODES_HOST_OS)
+                    KEYCODES_MACRO + KEYCODES_USER + KEYCODES_HIDDEN + KEYCODES_MIDI +
+                    # last so that the real TD(x) / HOS(n) objects (with summary and tooltip) win over the
+                    # hidden TD(x) placeholders in KEYCODES_MAP
+                    KEYCODES_TAP_DANCE + KEYCODES_HOST_OS)
     KEYCODES_MAP.clear()
     RAWCODES_MAP.clear()
     for keycode in KEYCODES:
@@ -922,12 +923,19 @@ def recreate_keyboard_keycodes(keyboard):
     KEYCODES_TAP_DANCE.clear()
     for x in range(host_os_base):
         lbl = "TD({})".format(x)
-        KEYCODES_TAP_DANCE.append(Keycode(lbl, lbl, "Tap dance keycode"))
+        kc = Keycode(lbl, lbl, "Tap dance keycode")
+        kc.summary = ""   # card data, filled in by entry_labels.update() once the entries are read
+        kc.rows = []
+        kc.title_extra = ""
+        KEYCODES_TAP_DANCE.append(kc)
     KEYCODES_HOST_OS.clear()
     for x in range(host_os_count):
         qmk_id = "TD({})".format(host_os_base + x)
         alias = "HOS({})".format(x)
         kc = Keycode(qmk_id, alias, "HostOS key {} (tap dance slot {})".format(x, host_os_base + x), alias=[alias])
+        kc.summary = ""   # card data, filled in by entry_labels.update() once the entries are read
+        kc.rows = []
+        kc.title_extra = ""
         Keycode.qmk_id_to_keycode[alias] = kc
         KEYCODES_HOST_OS.append(kc)
 

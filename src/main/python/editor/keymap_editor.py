@@ -30,25 +30,37 @@ class KeymapEditor(BasicEditor):
 
         self.layout_editor = layout_editor
 
-        self.layout_layers = QHBoxLayout()
+        # layer buttons stacked vertically under the "Layer" label, left of the keyboard;
+        # zoom buttons in a column on the right
+        self.layout_layers = QVBoxLayout()
         self.layout_size = QVBoxLayout()
-        layer_label = QLabel(tr("KeymapEditor", "Layer"))
+        self.layer_label = QLabel(tr("KeymapEditor", "Layer"))
 
-        layout_labels_container = QHBoxLayout()
-        layout_labels_container.addWidget(layer_label)
-        layout_labels_container.addLayout(self.layout_layers)
-        layout_labels_container.addStretch()
-        layout_labels_container.addLayout(self.layout_size)
+        layer_column = QVBoxLayout()
+        layer_column.addWidget(self.layer_label)
+        layer_column.setAlignment(self.layer_label, Qt.AlignHCenter)
+        layer_column.addLayout(self.layout_layers)
+        layer_column.addStretch()
+
+        size_column = QVBoxLayout()
+        size_column.addLayout(self.layout_size)
+        size_column.addStretch()
 
         # contains the actual keyboard
         self.container = KeyboardWidget(layout_editor)
         self.container.clicked.connect(self.on_key_clicked)
         self.container.deselected.connect(self.on_key_deselected)
 
+        row = QHBoxLayout()
+        row.addLayout(layer_column)
+        row.addStretch()
+        row.addWidget(self.container)
+        row.setAlignment(self.container, Qt.AlignHCenter | Qt.AlignTop)
+        row.addStretch()
+        row.addLayout(size_column)
+
         layout = QVBoxLayout()
-        layout.addLayout(layout_labels_container)
-        layout.addWidget(self.container)
-        layout.setAlignment(self.container, Qt.AlignHCenter)
+        layout.addLayout(row)
         w = ClickableWidget()
         w.setLayout(layout)
         w.clicked.connect(self.on_empty_space_clicked)
@@ -89,7 +101,8 @@ class KeymapEditor(BasicEditor):
         for x in range(self.keyboard.layers):
             btn = SquareButton(str(x))
             btn.setFocusPolicy(Qt.NoFocus)
-            btn.setRelSize(1.667)
+            btn.setRelSize(2.2)
+            btn.setWidthFactor(3)   # wide layer buttons
             btn.setCheckable(True)
             btn.clicked.connect(lambda state, idx=x: self.switch_layer(idx))
             self.layout_layers.addWidget(btn)
@@ -97,6 +110,7 @@ class KeymapEditor(BasicEditor):
         for x in range(0,2):
             btn = SquareButton("-") if x else SquareButton("+")
             btn.setFocusPolicy(Qt.NoFocus)
+            btn.setRelSize(2.2)
             btn.setCheckable(False)
             btn.clicked.connect(lambda state, idx=x: self.adjust_size(idx))
             self.layout_size.addWidget(btn)

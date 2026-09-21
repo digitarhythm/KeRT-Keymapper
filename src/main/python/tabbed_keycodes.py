@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout
+from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout, QHBoxLayout, QSizePolicy
 from PyQt5.QtGui import QPalette
 
-from constants import KEYCODE_BTN_RATIO
+from constants import KEYCODE_BTN_RATIO, PICKER_FONT_DELTA
+import key_style
 from widgets.display_keyboard import DisplayKeyboard
 from widgets.display_keyboard_defs import ansi_100, ansi_80, ansi_70, iso_100, iso_80, iso_70, mods, mods_narrow
 from widgets.flowlayout import FlowLayout
@@ -13,6 +14,7 @@ from keycodes.keycodes import KEYCODES_BASIC, KEYCODES_ISO, KEYCODES_MACRO, KEYC
     KEYCODES_BACKLIGHT, KEYCODES_MEDIA, KEYCODES_SPECIAL, KEYCODES_SHIFTED, KEYCODES_USER, Keycode, \
     KEYCODES_TAP_DANCE, KEYCODES_HOST_OS, KEYCODES_MIDI, KEYCODES_BASIC_NUMPAD, KEYCODES_BASIC_NAV, KEYCODES_ISO_KR
 from widgets.square_button import SquareButton
+from widgets.entry_card_button import EntryCardButton
 from util import tr, KeycodeDisplay
 
 
@@ -32,22 +34,69 @@ class AlternativeDisplay(QWidget):
         if prefix_buttons:
             for title, code in prefix_buttons:
                 btn = SquareButton()
+                btn.setFontDelta(PICKER_FONT_DELTA)
                 btn.setRelSize(KEYCODE_BTN_RATIO)
                 btn.setText(title)
                 btn.clicked.connect(lambda st, k=code: self.keycode_changed.emit(title))
                 self.key_layout.addWidget(btn)
 
-        layout = QVBoxLayout()
+        # everything is left-aligned inside one block; the block is as wide as the display keyboard
+        # (full width when there is none) and centred in the tab page
+        block_layout = QVBoxLayout()
+        block_layout.setContentsMargins(0, 0, 0, 0)
         if kbdef:
             self.kb_display = DisplayKeyboard(kbdef)
             self.kb_display.keycode_changed.connect(self.keycode_changed)
-            layout.addWidget(self.kb_display)
-            layout.setAlignment(self.kb_display, Qt.AlignHCenter)
-        layout.addLayout(self.key_layout)
+            block_layout.addWidget(self.kb_display)
+            block_layout.setAlignment(self.kb_display, Qt.AlignLeft)
+        block_layout.addLayout(self.key_layout)
+        self.block = QWidget()
+        self.block.setLayout(block_layout)
+
+        # the block is centred with stretches; its width is fixed in update_block_width()
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addStretch(1)
+        row.addWidget(self.block)
+        row.addStretch(1)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addLayout(row)
+        layout.addStretch(1)
         self.setLayout(layout)
+
+    def flow_row_width(self):
+        """Width the flow layout would need to put every button on one row"""
+        width = 0
+        for i in range(self.key_layout.count()):
+            item = self.key_layout.itemAt(i)
+            w = item.widget()
+            if w is None or w.isHidden():
+                continue
+            spacing = self.key_layout.spacing() + w.style().layoutSpacing(
+                QSizePolicy.PushButton, QSizePolicy.PushButton, Qt.Horizontal)
+            width += item.sizeHint().width() + spacing
+        return width
+
+    def update_block_width(self):
+        """Keyboard tabs: as wide as the display keyboard. Other tabs: as wide as one row of buttons,
+        or the full width when they need to wrap. Either way the block is centred and its contents
+        are left-aligned."""
+        if self.kb_display:
+            width = self.kb_display.sizeHint().width()
+        else:
+            width = min(self.width(), max(self.flow_row_width(), 1))
+        if width > 0 and self.block.width() != width:
+            self.block.setFixedWidth(width)
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        self.update_block_width()
 
     def recreate_buttons(self, keycode_filter):
         for btn in self.buttons:
+            # take it out of the flow layout too, otherwise the dead item keeps adding spacing
+            self.key_layout.removeWidget(btn)
             btn.hide()
             btn.deleteLater()
         self.buttons = []
@@ -55,7 +104,10 @@ class AlternativeDisplay(QWidget):
         for keycode in self.keycodes:
             if keycode.hidden or not keycode_filter(keycode.qmk_id):
                 continue
-            btn = SquareButton()
+            # Tap Dance / HostOS entries get a card showing their contents (see entry_labels.py)
+            btn = EntryCardButton() if hasattr(keycode, "summary") else SquareButton()
+            btn.frame_extra = key_style.OUTLINE_WIDTH
+            btn.setFontDelta(PICKER_FONT_DELTA)
             btn.setRelSize(KEYCODE_BTN_RATIO)
             btn.setToolTip(Keycode.tooltip(keycode.qmk_id))
             btn.clicked.connect(lambda st, k=keycode: self.keycode_changed.emit(k.qmk_id))
@@ -64,6 +116,7 @@ class AlternativeDisplay(QWidget):
             self.buttons.append(btn)
 
         self.relabel_buttons()
+        self.update_block_width()
 
     def relabel_buttons(self):
         if self.kb_display:

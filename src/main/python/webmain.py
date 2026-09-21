@@ -10,6 +10,7 @@ import sys
 import json
 
 from main_window import MainWindow
+import branding_theme
 
 
 # http://timlehr.com/python-exception-hooks-with-qt-message-box/
@@ -69,6 +70,7 @@ def main(app):
 
     # Not sure of the best way to do this.
     global window
+    branding_theme.register()
     window = MainWindow(app)
     window.show()
 

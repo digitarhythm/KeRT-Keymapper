@@ -28,6 +28,11 @@ class KeyWidget(KeyboardWidget):
         self.anykey.connect(self.on_anykey)
         KeycodeDisplay.notify_keymap_override(self)
 
+    def set_scale(self, scale):
+        """ Draw the key smaller/larger than the default (1.0); cards use this to stay compact """
+        self.scale = scale
+        self.update_layout()
+
     def delete(self):
         KeycodeDisplay.unregister_keymap_override(self)
         super().delete()

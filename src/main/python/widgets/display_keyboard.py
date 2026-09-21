@@ -4,7 +4,8 @@ import json
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QGridLayout, QWidget, QSizePolicy
 
-from constants import KEYCODE_BTN_RATIO
+from constants import KEYCODE_BTN_RATIO, PICKER_FONT_DELTA
+import key_style
 from keycodes.keycodes import Keycode
 from util import KeycodeDisplay
 from widgets.square_button import SquareButton
@@ -26,6 +27,8 @@ class DisplayKeyboard(QWidget):
         for key in keymap.keys:
             kc = Keycode.find_by_qmk_id(key.labels[0])
             btn = SquareButton()
+            btn.frame_extra = key_style.OUTLINE_WIDTH
+            btn.setFontDelta(PICKER_FONT_DELTA)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             btn.setRelSize(KEYCODE_BTN_RATIO)
             btn.setContentsMargins(0, 0, 0, 0)

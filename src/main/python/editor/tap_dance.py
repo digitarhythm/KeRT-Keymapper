@@ -1,16 +1,19 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal, QObject
-from PyQt5.QtWidgets import QTabWidget, QWidget, QSizePolicy, QGridLayout, QVBoxLayout, QLabel, QHBoxLayout, \
+from PyQt5.QtWidgets import QWidget, QSizePolicy, QGridLayout, QVBoxLayout, QLabel, QHBoxLayout, \
     QPushButton, QSpinBox
 
 from protocol.constants import VIAL_PROTOCOL_DYNAMIC
 from widgets.key_widget import KeyWidget
-from tabbed_keycodes import TabbedKeycodes
 from util import tr
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
-from widgets.tab_widget_keycodes import TabWidgetWithKeycodes
+from widgets.entry_card import EntryCard, EntryCardContainer
+import entry_labels
+
+# キーの描画倍率。カード内では通常より小さく描いて行間を詰める
+CARD_KEY_SCALE = 0.7
 
 
 class TapDanceEntryUI(QObject):
@@ -29,19 +32,14 @@ class TapDanceEntryUI(QObject):
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
         l = QVBoxLayout()
-        l.addStretch()
-        l.addSpacing(10)
+        l.setContentsMargins(0, 0, 0, 0)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
-        l.addSpacing(10)
-        lbl = QLabel("Use <code>TD({})</code> to set up this action in the keymap.".format(self.idx))
-        l.addWidget(lbl)
-        l.setAlignment(lbl, QtCore.Qt.AlignHCenter)
-        l.addStretch()
         self.w2 = QWidget()
         self.w2.setLayout(l)
 
     def populate_container(self):
+        self.container.setVerticalSpacing(3)
         self.container.addWidget(QLabel("On tap"), 0, 0)
         self.kc_on_tap = KeyWidget()
         self.kc_on_tap.changed.connect(self.on_key_changed)
@@ -64,6 +62,8 @@ class TapDanceEntryUI(QObject):
         self.txt_tapping_term.setMinimum(0)
         self.txt_tapping_term.setMaximum(10000)
         self.container.addWidget(self.txt_tapping_term, 4, 1)
+        for kc in (self.kc_on_tap, self.kc_on_hold, self.kc_on_double_tap, self.kc_on_tap_hold):
+            kc.set_scale(CARD_KEY_SCALE)
 
     def widget(self):
         return self.w2
@@ -106,14 +106,19 @@ class TapDance(BasicEditor):
 
         self.tap_dance_entries = []
         self.tap_dance_entries_available = []
-        self.tabs = TabWidgetWithKeycodes()
+        self.cards_available = []
+        self.cards = []
+        self.container = EntryCardContainer()
         for x in range(128):
             entry = TapDanceEntryUI(x)
             entry.key_changed.connect(self.on_key_changed)
             entry.timing_changed.connect(self.on_timing_changed)
             self.tap_dance_entries_available.append(entry)
+            self.cards_available.append(EntryCard(entry.widget()))
 
-        self.addWidget(self.tabs)
+        self.hint = QLabel("Use <code>TD(n)</code> to set up these actions in the keymap.")
+        self.addWidget(self.hint)
+        self.addWidget(self.container)
         buttons = QHBoxLayout()
         buttons.addStretch()
         self.btn_save = QPushButton(tr("TapDance", "Save"))
@@ -125,13 +130,11 @@ class TapDance(BasicEditor):
         self.addLayout(buttons)
 
     def rebuild_ui(self):
-        while self.tabs.count() > 0:
-            self.tabs.removeTab(0)
         # the last host_os_count slots are HostOS keys and are edited in the HostOS tab instead
         count = self.keyboard.tap_dance_count - getattr(self.keyboard, "host_os_count", 0)
         self.tap_dance_entries = self.tap_dance_entries_available[:count]
-        for x, e in enumerate(self.tap_dance_entries):
-            self.tabs.addTab(e.widget(), str(x))
+        self.cards = self.cards_available[:count]
+        self.container.set_cards(self.cards)
         self.reload_ui()
 
     def reload_ui(self):
@@ -143,6 +146,7 @@ class TapDance(BasicEditor):
         for x, e in enumerate(self.tap_dance_entries):
             self.keyboard.tap_dance_set(x, self.tap_dance_entries[x].save())
         self.update_modified_state()
+        entry_labels.update(self.keyboard)
 
     def on_revert(self):
         self.keyboard.reload_dynamic()
@@ -163,14 +167,15 @@ class TapDance(BasicEditor):
         self.on_save()
 
     def update_modified_state(self):
-        """ Update indication of which tabs are modified, and keep Save button enabled only if it's needed """
+        """ Update indication of which cards are modified, and keep Save button enabled only if it's needed """
         has_changes = False
         for x, e in enumerate(self.tap_dance_entries):
-            if self.tap_dance_entries[x].save() != self.keyboard.tap_dance_get(x):
+            data = e.save()
+            title = "TD({})  {}ms".format(x, data[4])
+            if data != self.keyboard.tap_dance_get(x):
                 has_changes = True
-                self.tabs.setTabText(x, "{}*".format(x))
-            else:
-                self.tabs.setTabText(x, str(x))
+                title += "*"
+            self.cards[x].set_title(title)
         self.btn_save.setEnabled(has_changes)
 
     def on_timing_changed(self):

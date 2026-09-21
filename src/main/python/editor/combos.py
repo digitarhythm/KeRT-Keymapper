@@ -7,7 +7,10 @@ from protocol.constants import VIAL_PROTOCOL_DYNAMIC
 from widgets.key_widget import KeyWidget
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
-from widgets.tab_widget_keycodes import TabWidgetWithKeycodes
+from widgets.entry_card import EntryCard, EntryCardContainer
+
+# キーの描画倍率。カード内では通常より小さく描いて行間を詰める
+CARD_KEY_SCALE = 0.7
 
 
 class ComboEntryUI(QObject):
@@ -26,20 +29,24 @@ class ComboEntryUI(QObject):
         w.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         w.setLayout(self.container)
         l = QVBoxLayout()
+        l.setContentsMargins(0, 0, 0, 0)
         l.addWidget(w)
         l.setAlignment(w, QtCore.Qt.AlignHCenter)
         self.w2 = QWidget()
         self.w2.setLayout(l)
 
     def populate_container(self):
+        self.container.setVerticalSpacing(3)
         for x in range(4):
             kc_widget = KeyWidget()
+            kc_widget.set_scale(CARD_KEY_SCALE)
             kc_widget.changed.connect(self.on_key_changed)
             self.container.addWidget(QLabel("Key {}".format(x + 1)), x, 0)
             self.container.addWidget(kc_widget, x, 1)
             self.kc_inputs.append(kc_widget)
 
         self.kc_output = KeyWidget()
+        self.kc_output.set_scale(CARD_KEY_SCALE)
         self.kc_output.changed.connect(self.on_key_changed)
         self.container.addWidget(QLabel("Output key"), 4, 0)
         self.container.addWidget(self.kc_output, 4, 1)
@@ -80,20 +87,23 @@ class Combos(BasicEditor):
 
         self.combo_entries = []
         self.combo_entries_available = []
-        self.tabs = TabWidgetWithKeycodes()
+        self.cards_available = []
+        self.cards = []
+        self.container = EntryCardContainer()
         for x in range(128):
             entry = ComboEntryUI(x)
             entry.key_changed.connect(self.on_key_changed)
             self.combo_entries_available.append(entry)
+            card = EntryCard(entry.widget())
+            card.set_title("Combo {}".format(x + 1))
+            self.cards_available.append(card)
 
-        self.addWidget(self.tabs)
+        self.addWidget(self.container)
 
     def rebuild_ui(self):
-        while self.tabs.count() > 0:
-            self.tabs.removeTab(0)
         self.combo_entries = self.combo_entries_available[:self.keyboard.combo_count]
-        for x, e in enumerate(self.combo_entries):
-            self.tabs.addTab(e.widget(), str(x + 1))
+        self.cards = self.cards_available[:self.keyboard.combo_count]
+        self.container.set_cards(self.cards)
         for x, e in enumerate(self.combo_entries):
             e.load(self.keyboard.combo_get(x))
 

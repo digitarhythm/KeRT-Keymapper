@@ -13,7 +13,7 @@ from main_window import MainWindow
 
 from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_VIAL_PREFIX, CMD_VIAL_GET_KEYBOARD_ID, \
     CMD_VIAL_GET_SIZE, CMD_VIAL_GET_DEFINITION, CMD_VIA_GET_LAYER_COUNT, CMD_VIA_MACRO_GET_COUNT, \
-    CMD_VIA_MACRO_GET_BUFFER_SIZE, CMD_VIAL_QMK_SETTINGS_QUERY, CMD_VIAL_DYNAMIC_ENTRY_OP, \
+    CMD_VIA_MACRO_GET_BUFFER_SIZE, CMD_VIA_MACRO_SET_BUFFER, CMD_VIAL_QMK_SETTINGS_QUERY, CMD_VIAL_DYNAMIC_ENTRY_OP, \
     DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES, CMD_VIA_KEYMAP_GET_BUFFER, CMD_VIA_MACRO_GET_BUFFER, CMD_VIAL_GET_UNLOCK_STATUS, \
     CMD_VIA_SET_KEYCODE, DYNAMIC_VIAL_COMBO_GET, DYNAMIC_VIAL_COMBO_SET, DYNAMIC_VIAL_TAP_DANCE_GET, \
     DYNAMIC_VIAL_TAP_DANCE_SET
@@ -56,7 +56,7 @@ def mock_enumerate():
 
 class VirtualKeyboard:
 
-    def __init__(self, kbjson, combos=None, tap_dance=None):
+    def __init__(self, kbjson, combos=None, tap_dance=None, macro_buffer=None):
         if combos is None:
             combos = []
         if tap_dance is None:
@@ -74,7 +74,7 @@ class VirtualKeyboard:
                 self.keymap[-1].append([0 for x in range(self.cols)])
 
         self.macro_count = 8
-        self.macro_buffer = b"\x00" * 512
+        self.macro_buffer = macro_buffer if macro_buffer is not None else b"\x00" * 512
 
         self.combos = combos
         self.tap_dance = tap_dance
@@ -152,7 +152,13 @@ class VirtualKeyboard:
             return struct.pack(">BH", msg[0], len(self.macro_buffer))
         elif msg[0] == CMD_VIA_MACRO_GET_BUFFER:
             offset, size = struct.unpack_from(">HB", msg[1:])
-            return msg[0:1] + self.macro_buffer[offset:offset+size]
+            # the reply echoes the 4-byte request header (cmd, offset, size) before the data
+            return msg[0:4] + self.macro_buffer[offset:offset+size]
+        elif msg[0] == CMD_VIA_MACRO_SET_BUFFER:
+            offset, size = struct.unpack_from(">HB", msg[1:])
+            chunk = bytes(msg[4:4 + size])
+            self.macro_buffer = self.macro_buffer[:offset] + chunk + self.macro_buffer[offset + size:]
+            return msg[0:4]
         elif msg[0] == CMD_VIA_GET_LAYER_COUNT:
             return struct.pack(">BB", msg[0], self.layers)
         elif msg[0] == CMD_VIA_KEYMAP_GET_BUFFER:
@@ -193,7 +199,7 @@ class FakeAppctx:
 all_mw = []
 
 
-def prepare(qtbot, keyboard_json, combos=None, tap_dance=None):
+def prepare(qtbot, keyboard_json, combos=None, tap_dance=None, macro_buffer=None):
     import hidraw as hid
     from PyQt5 import sip
     from util import KeycodeDisplay
@@ -202,7 +208,7 @@ def prepare(qtbot, keyboard_json, combos=None, tap_dance=None):
     # TabbedKeycodes are gone on the C++ side but still registered here, so drop them before building a new one
     KeycodeDisplay.clients = [c for c in KeycodeDisplay.clients if not sip.isdeleted(c)]
 
-    vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance)
+    vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance, macro_buffer=macro_buffer)
     MockDevice.vk = vk
 
     hid.enumerate = mock_enumerate
@@ -448,170 +454,145 @@ def test_layer_switch(qtbot):
     assert c.widgets[0].text == "Z"
 
 
+def key_pos(keywidget):
+    """ A point on the outer part of the (single) key drawn by a KeyWidget, as an int QPoint for
+    qtbot.mouseClick. Near the top-left corner so that it never lands on the inner mask of a masked key """
+    bbox = keywidget.widgets[0].bbox
+    sc = keywidget.scale   # bbox is in unscaled coordinates; cards draw their keys smaller
+    return QPoint(int(min(p.x() for p in bbox) * sc) + 3, int(min(p.y() for p in bbox) * sc) + 3)
+
+
+def key_mask_pos(keywidget):
+    """ A point inside the inner (mask) part of a masked key """
+    bbox = keywidget.widgets[0].bbox
+    sc = keywidget.scale
+    min_x = min(p.x() for p in bbox) * sc
+    max_x = max(p.x() for p in bbox) * sc
+    min_y = min(p.y() for p in bbox) * sc
+    max_y = max(p.y() for p in bbox) * sc
+    return QPoint(int((min_x + max_x) / 2), int(min_y + (max_y - min_y) * 4 / 5))
+
+
+def card_headers(editor):
+    return [c.header.text() for c in editor.cards]
+
+
 def test_combos(qtbot):
+    """ Combos are shown as cards (all entries at once) and edited in place """
     from widgets.key_widget import KeyWidget
 
-    """ Tests setting combo keycodes """
     mw, vk = prepare(qtbot, FAKE_KEYBOARD, combos=[[0, 0, 0, 0, 0], [4, 5, 6, 7, 8], [0, 0x106, 0, 0, 0]])
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
 
-    combos = None
-    for x in range(mw.tabs.count()):
-        if mw.tabs.tabText(x) == "Combos":
-            combos = mw.tabs.widget(x).editor
+    combos = find_tab(mw, "Combos").editor
+    assert card_headers(combos) == ["Combo 1", "Combo 2", "Combo 3"]
 
-    assert combos is not None, "could not find the combos tab"
-    ct = combos.tabs
-
-    tabs = []
-    for x in range(ct.count()):
-        tabs.append(ct.tabText(x))
-    assert tabs == ["1", "2", "3"]
-
-    def check_tab(idx, keys):
-        ct.setCurrentIndex(idx)
-        assert ct.tabText(ct.currentIndex()) == str(idx + 1)
-        w = ct.widget(ct.currentIndex()).findChildren(KeyWidget)
+    def check_card(idx, keys):
+        w = combos.cards[idx].findChildren(KeyWidget)
         assert len(w) == 5
         for x in range(5):
-            assert w[x].keycode == keys[x], "unexpected keycode at tab {} position {}: {} vs {}".format(idx, x, w[x].keycode, keys[x])
+            assert w[x].keycode == keys[x], "unexpected keycode at card {} position {}: {} vs {}".format(idx, x, w[x].keycode, keys[x])
 
-    check_tab(0, ["KC_NO", "KC_NO", "KC_NO", "KC_NO", "KC_NO"])
-    check_tab(1, ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E"])
-    check_tab(2, ["KC_NO", "LCTL(KC_C)", "KC_NO", "KC_NO", "KC_NO"])
+    check_card(0, ["KC_NO", "KC_NO", "KC_NO", "KC_NO", "KC_NO"])
+    check_card(1, ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E"])
+    check_card(2, ["KC_NO", "LCTL(KC_C)", "KC_NO", "KC_NO", "KC_NO"])
 
-    # ok now still on tab index 2, let's switch some combos
-    # change "Key 1" to "A"
+    # card 3: change "Key 1" to "A"
     assert not mw.tray_keycodes.isVisible()
-    w = ct.widget(ct.currentIndex()).findChildren(KeyWidget)
-    bbox = w[0].widgets[0].bbox
-    min_x = min(p.x() for p in bbox)
-    max_x = max(p.x() for p in bbox)
-    min_y = min(p.y() for p in bbox)
-    max_y = max(p.y() for p in bbox)
-    pos_mask = QPoint(int((min_x + max_x) / 2), int(min_y + (max_y - min_y) * 4/5))
-    pos = QPoint(bbox[0].x(), bbox[0].y())
-    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
+    w = combos.cards[2].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
     assert mw.tray_keycodes.isVisible()
-
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "A"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.combos[2] == (4, 0x106, 0, 0, 0)
 
     # change "Output key" to "B"
-    qtbot.mouseClick(w[4], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
+    qtbot.mouseClick(w[4], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[4]))
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "B"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.combos[2] == (4, 0x106, 0, 0, 5)
 
     ak = mw.tray_keycodes.all_keycodes
     bk = mw.tray_keycodes.basic_keycodes
 
-    # change "Key 4" to LSft(D)
-    # first set up LSft(kc)
-    qtbot.mouseClick(w[3], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
-    assert ak.isVisible()
-    assert not bk.isVisible()
+    # change "Key 4" to LSft(D): first the mask, then the key inside it
+    qtbot.mouseClick(w[3], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[3]))
+    assert ak.isVisible() and not bk.isVisible()
     ak.setCurrentIndex(3)
     assert ak.tabText(ak.currentIndex()) == "Quantum"
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "LSft\n(kc)"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.combos[2] == (4, 0x106, 0, 0x200, 5)
-    # now click the mask and set up D inside
-    qtbot.mouseClick(w[3], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos_mask)
-    assert not ak.isVisible()
-    assert bk.isVisible()
+    qtbot.mouseClick(w[3], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_mask_pos(w[3]))
+    assert not ak.isVisible() and bk.isVisible()
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "D"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.combos[2] == (4, 0x106, 0, 0x207, 5)
 
     # change "Key 2" to E
-    qtbot.mouseClick(w[1], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
-    assert ak.isVisible()
-    assert not bk.isVisible()
+    qtbot.mouseClick(w[1], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[1]))
+    assert ak.isVisible() and not bk.isVisible()
     ak.setCurrentIndex(0)
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "E"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.combos[2] == (4, 8, 0, 0x207, 5)
 
-    # check the final result in the gui as well
-    check_tab(2, ["KC_A", "KC_E", "KC_NO", "LSFT(KC_D)", "KC_B"])
-
-    # TODO: a future unit test should check switching between multiple keyboards with different number of combos
+    check_card(2, ["KC_A", "KC_E", "KC_NO", "LSFT(KC_D)", "KC_B"])
 
 
 def test_tap_dance(qtbot):
+    """ Tap dances are shown as cards with their tapping term in the header and edited in place """
     from widgets.key_widget import KeyWidget
     from PyQt5.QtWidgets import QSpinBox
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD, tap_dance=[[0, 0, 0, 0, 200], [4, 5, 6, 7, 200], [0, 0x106, 0, 0, 500]])
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
 
-    # TODO: a future unit test should check switching between multiple keyboards with different number of tap dances
+    tde = find_tab(mw, "Tap Dance").editor
+    assert card_headers(tde) == ["TD(0)  200ms", "TD(1)  200ms", "TD(2)  500ms"]
+    assert "TD(n)" in tde.hint.text()
+    assert all(c.sizeHint().width() == c.sizeHint().height() for c in tde.cards)
 
-    tde = None
-    for x in range(mw.tabs.count()):
-        if mw.tabs.tabText(x) == "Tap Dance":
-            tde = mw.tabs.widget(x).editor
-
-    assert tde is not None, "could not find the combos tab"
-    td = tde.tabs
-
-    tabs = []
-    for x in range(td.count()):
-        tabs.append(td.tabText(x))
-    assert tabs == ["0", "1", "2"]
-
-    def check_tab(idx, keys, timeout):
-        td.setCurrentIndex(idx)
-        assert td.tabText(td.currentIndex()) == str(idx)
-        w = td.widget(td.currentIndex()).findChildren(KeyWidget)
+    def check_card(idx, keys, timeout):
+        card = tde.cards[idx]
+        w = card.findChildren(KeyWidget)
         assert len(w) == 4
         for x in range(4):
-            assert w[x].keycode == keys[x], "unexpected keycode at tab {} position {}: {} vs {}".format(idx, x, w[x].keycode, keys[x])
-        timeout_w = td.widget(td.currentIndex()).findChildren(QSpinBox)[0]
-        assert timeout_w.value() == timeout
+            assert w[x].keycode == keys[x], "unexpected keycode at card {} position {}: {} vs {}".format(idx, x, w[x].keycode, keys[x])
+        assert card.findChildren(QSpinBox)[0].value() == timeout
 
-    check_tab(0, ["KC_NO", "KC_NO", "KC_NO", "KC_NO"], 200)
-    check_tab(1, ["KC_A", "KC_B", "KC_C", "KC_D"], 200)
-    check_tab(2, ["KC_NO", "LCTL(KC_C)", "KC_NO", "KC_NO"], 500)
+    check_card(0, ["KC_NO", "KC_NO", "KC_NO", "KC_NO"], 200)
+    check_card(1, ["KC_A", "KC_B", "KC_C", "KC_D"], 200)
+    check_card(2, ["KC_NO", "LCTL(KC_C)", "KC_NO", "KC_NO"], 500)
 
-    # ok now still on tab index 2, let's switch the tap dance
-    # change "Key 1" to "A"
+    # card TD(2): the keycode change is immediate but not the timeout change
     assert not mw.tray_keycodes.isVisible()
-    w = td.widget(td.currentIndex()).findChildren(KeyWidget)
-    bbox = w[0].widgets[0].bbox
-    min_x = min(p.x() for p in bbox)
-    max_x = max(p.x() for p in bbox)
-    min_y = min(p.y() for p in bbox)
-    max_y = max(p.y() for p in bbox)
-    pos_mask = QPoint(int((min_x + max_x) / 2), int(min_y + (max_y - min_y) * 4/5))
-    pos = QPoint(bbox[0].x(), bbox[0].y())
-    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
+    w = tde.cards[2].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
     assert mw.tray_keycodes.isVisible()
-
-    # note that for the tap dance the keycode change is immediate but not the timeout change
     qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "A"), qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert vk.tap_dance[2] == (4, 0x106, 0, 0, 500)
 
-    timeout_w = td.widget(td.currentIndex()).findChildren(QSpinBox)[0]
+    timeout_w = tde.cards[2].findChildren(QSpinBox)[0]
     timeout_w.setValue(123)
     assert vk.tap_dance[2] == (4, 0x106, 0, 0, 500)
 
-    # check that we are adding * to the tab text when there are pending changes
-    assert td.tabText(td.currentIndex()) == "2*"
+    # pending changes are marked with * in the card header, and enable Save
+    assert tde.cards[2].header.text() == "TD(2)  123ms*"
+    assert tde.btn_save.isEnabled()
     timeout_w.setValue(500)
-    assert td.tabText(td.currentIndex()) == "2"
+    assert tde.cards[2].header.text() == "TD(2)  500ms"
+    assert not tde.btn_save.isEnabled()
 
-    # ok commit the change now
+    # commit
     timeout_w.setValue(123)
-    assert td.tabText(td.currentIndex()) == "2*"
     qtbot.mouseClick(tde.btn_save, qt_api.QtCore.Qt.MouseButton.LeftButton)
-    assert td.tabText(td.currentIndex()) == "2"
+    assert tde.cards[2].header.text() == "TD(2)  123ms"
     assert vk.tap_dance[2] == (4, 0x106, 0, 0, 123)
 
-    # let's check that reverting works
+    # revert
     assert not tde.btn_save.isEnabled()
     timeout_w.setValue(321)
     assert tde.btn_save.isEnabled()
-    assert td.tabText(td.currentIndex()) == "2*"
-
+    assert tde.cards[2].header.text() == "TD(2)  321ms*"
     qtbot.mouseClick(tde.btn_revert, qt_api.QtCore.Qt.MouseButton.LeftButton)
     assert not tde.btn_save.isEnabled()
-    assert td.tabText(td.currentIndex()) == "2"
+    assert tde.cards[2].header.text() == "TD(2)  123ms"
     assert timeout_w.value() == 123
 
 
@@ -665,7 +646,7 @@ def test_host_os_hidden_without_definition(qtbot):
     assert kb.host_os_count == 0
 
     tde = find_tab(mw, "Tap Dance").editor
-    assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1", "2", "3"]
+    assert len(tde.cards) == 4
 
 
 def test_host_os(qtbot):
@@ -690,20 +671,22 @@ def test_host_os(qtbot):
     main_tabs = [mw.tabs.tabText(x) for x in range(mw.tabs.count())]
     assert main_tabs.index("HostOS") == main_tabs.index("Tap Dance") + 1
     tde = find_tab(mw, "Tap Dance").editor
-    assert [tde.tabs.tabText(x) for x in range(tde.tabs.count())] == ["0", "1"]
+    assert card_headers(tde) == ["TD(0)  200ms", "TD(1)  200ms"]
 
     container = find_tab(mw, "HostOS")
     assert container is not None, "could not find the HostOS tab"
-    ho = container.editor.tabs
-    assert [ho.tabText(x) for x in range(ho.count())] == ["0", "1"]
+    hoe = container.editor
+    assert card_headers(hoe) == ["HOS(0)", "HOS(1)"]
+    # one hint for the whole tab instead of one per card
+    hint = hoe.hint.text()
+    assert "HOS(n)" in hint and "Default" in hint
+    assert "TD(" not in hint          # the tap dance slot behind a HostOS key is an implementation detail
 
     # every keycode change is stored immediately, so there is nothing for Save / Revert to do
     assert [b.text() for b in container.findChildren(QPushButton) if b.text() in ("Save", "Revert")] == []
 
     def check_tab(idx, keys):
-        ho.setCurrentIndex(idx)
-        assert ho.tabText(ho.currentIndex()) == str(idx)
-        page = ho.widget(ho.currentIndex())
+        page = hoe.cards[idx]
 
         w = page.findChildren(KeyWidget)
         assert len(w) == 4
@@ -713,23 +696,18 @@ def test_host_os(qtbot):
         # the marker / tapping term is not exposed
         assert page.findChildren(QSpinBox) == []
 
-        labels = [l.text() for l in page.findChildren(QLabel)]
-        hints = [t for t in labels if "keymap" in t]
-        assert [t for t in labels if "keymap" not in t] == ["Mac", "Win", "Linux", "Default"]
-
-        assert len(hints) == 1
-        assert "HOS({})".format(idx) in hints[0]
-        assert "TD({})".format(2 + idx) in hints[0]
+        labels = [l.text() for l in page.findChildren(QLabel) if l is not page.header]
+        assert labels == ["Mac", "Win", "Linux", "Default"]
+        # cards are square (hidden tabs may not be laid out yet, so check the requested size)
+        assert page.sizeHint().width() == page.sizeHint().height()
 
     check_tab(0, ["KC_Q", "KC_W", "KC_E", "KC_R"])
     check_tab(1, ["KC_NO", "KC_NO", "KC_NO", "KC_X"])
 
-    # still on tab 1: set the Mac keycode to "A"
+    # card HOS(1): set the Mac keycode to "A"
     assert not mw.tray_keycodes.isVisible()
-    w = ho.widget(ho.currentIndex()).findChildren(KeyWidget)
-    bbox = w[0].widgets[0].bbox
-    pos = QPoint(int(sum(p.x() for p in bbox) / len(bbox)), int(sum(p.y() for p in bbox) / len(bbox)))
-    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=pos)
+    w = hoe.cards[1].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
     assert mw.tray_keycodes.isVisible()
 
     # the keycode list has a "HostOS" tab with HOS(n) right after "Tap Dance", which only has TD(0..base-1)
@@ -756,7 +734,7 @@ def test_host_os(qtbot):
     assert vk.tap_dance[3] == (4, 0, 0, 0x1B, HOST_OS_MARKER)
     assert vk.tap_dance[2] == [0x14, 0x1A, 0x08, 0x15, HOST_OS_MARKER]
     assert vk.tap_dance[1] == [4, 5, 6, 7, 200]
-    assert ho.tabText(ho.currentIndex()) == "1"
+    assert hoe.cards[1].header.text() == "HOS(1)"
 
     # HOS(n) is only a spelling of TD(base + n)
     assert Keycode.deserialize("HOS(1)") == Keycode.deserialize("TD(3)")
@@ -764,7 +742,7 @@ def test_host_os(qtbot):
     assert Keycode.serialize(Keycode.deserialize("HOS(1)")) == "TD(3)"
 
     # KC_TRNS means "empty": it is written as KC_NO and the UI is synced to what was actually stored
-    fields = ho.widget(1).findChildren(KeyWidget)
+    fields = hoe.cards[1].findChildren(KeyWidget)
     fields[1].set_keycode("KC_B")       # Win
     fields[2].set_keycode("KC_TRNS")    # Linux -> stored as KC_NO
     assert vk.tap_dance[3] == (4, 5, 0, 0x1B, HOST_OS_MARKER)
@@ -787,6 +765,172 @@ def test_host_os_count_clamped(qtbot):
     assert (kb.host_os_count, kb.host_os_base) == (4, 0)
     container = find_tab(mw, "HostOS")
     assert container is not None
-    assert [container.editor.tabs.tabText(x) for x in range(container.editor.tabs.count())] == ["0", "1", "2", "3"]
+    assert card_headers(container.editor) == ["HOS(0)", "HOS(1)", "HOS(2)", "HOS(3)"]
     tde = find_tab(mw, "Tap Dance").editor
-    assert tde.tabs.count() == 0
+    assert tde.cards == []
+
+
+def test_entry_cards_in_picker(qtbot):
+    """ The Tap Dance / HostOS keycode pickers show each entry as the same card as the editor and follow edits """
+    from PyQt5.QtWidgets import QLabel, QSpinBox
+    from widgets.entry_card_button import EntryCardButton
+    from widgets.key_widget import KeyWidget
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD_HOST_OS, tap_dance=[
+        [4, 0xE1, 5, 0, 200],                     # TD(0): A / LShift / B / -
+        [0x29, 0, 0, 0, 180],                     # TD(1): Esc / - / - / -
+        [0x14, 0x1A, 0x08, 0x15, HOST_OS_MARKER], # HOS(0): Q / W / E / R
+        [0, 0, 0, 0x1B, HOST_OS_MARKER],          # HOS(1): - / - / - / X
+    ])
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+
+    def picker_buttons(tab_label):
+        ak = mw.tray_keycodes.all_keycodes
+        idx = [x for x in range(ak.count()) if ak.tabText(x) == tab_label][0]
+        return {b.text: b for b in ak.widget(idx).findChildren(EntryCardButton)}
+
+    def card_keys(btn):
+        return [k.keycode for k in btn.findChildren(KeyWidget)]
+
+    def card_labels(btn):
+        return [l.text() for l in btn.findChildren(QLabel) if l is not btn.header]
+
+    td = picker_buttons("Tap Dance")
+    assert sorted(td) == ["TD(0)", "TD(1)"]
+    assert td["TD(0)"].header.text() == "TD(0)  200ms"
+    assert td["TD(1)"].header.text() == "TD(1)  180ms"
+    assert card_labels(td["TD(0)"]) == ["On tap", "On hold", "On double tap", "On tap + hold"]
+    assert card_keys(td["TD(0)"]) == ["KC_A", "KC_LSHIFT", "KC_B", "KC_NO"]
+    assert card_keys(td["TD(1)"]) == ["KC_ESCAPE", "KC_NO", "KC_NO", "KC_NO"]
+    tip = td["TD(0)"].toolTip()
+    assert "Tap: A" in tip and "Hold: LShift" in tip and "Tapping term: 200 ms" in tip
+    # the tray is hidden at this point, so check the requested size rather than the laid-out one
+    assert all(b.sizeHint().width() == b.sizeHint().height() for b in td.values())
+
+    ho = picker_buttons("HostOS")
+    assert sorted(ho) == ["HOS(0)", "HOS(1)"]
+    assert ho["HOS(0)"].header.text() == "HOS(0)"
+    assert card_labels(ho["HOS(0)"]) == ["Mac", "Win", "Linux", "Default"]
+    assert card_keys(ho["HOS(0)"]) == ["KC_Q", "KC_W", "KC_E", "KC_R"]
+    assert card_keys(ho["HOS(1)"]) == ["KC_NO", "KC_NO", "KC_NO", "KC_X"]
+    tip = ho["HOS(1)"].toolTip()
+    assert "Mac: \u2014" in tip and "Default: X" in tip and "Tapping term" not in tip
+
+    # editing an entry updates the picker cards
+    hoe = find_tab(mw, "HostOS").editor
+    w = hoe.cards[1].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
+    qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "A"), qt_api.QtCore.Qt.MouseButton.LeftButton)
+    assert vk.tap_dance[3] == (4, 0, 0, 0x1B, HOST_OS_MARKER)
+    assert card_keys(picker_buttons("HostOS")["HOS(1)"]) == ["KC_A", "KC_NO", "KC_NO", "KC_X"]
+
+    tde = find_tab(mw, "Tap Dance").editor
+    w = tde.cards[1].findChildren(KeyWidget)
+    qtbot.mouseClick(w[1], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[1]))
+    qtbot.mouseClick(find_key_btn(mw.tray_keycodes, "B"), qt_api.QtCore.Qt.MouseButton.LeftButton)
+    assert vk.tap_dance[1] == (0x29, 5, 0, 0, 180)
+    assert card_keys(picker_buttons("Tap Dance")["TD(1)"]) == ["KC_ESCAPE", "KC_B", "KC_NO", "KC_NO"]
+    # the tapping term shown in the header follows a saved change too
+    tde.cards[1].findChildren(QSpinBox)[0].setValue(250)
+    qtbot.mouseClick(tde.btn_save, qt_api.QtCore.Qt.MouseButton.LeftButton)
+    assert picker_buttons("Tap Dance")["TD(1)"].header.text() == "TD(1)  250ms"
+
+    # a picker card still assigns its keycode wherever it is clicked: put TD(0) into the Mac field of HOS(0)
+    w = hoe.cards[0].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
+    ak = mw.tray_keycodes.all_keycodes
+    ak.setCurrentIndex([x for x in range(ak.count()) if ak.tabText(x) == "Tap Dance"][0])
+    card = picker_buttons("Tap Dance")["TD(0)"]
+    # click where a key is drawn inside the card, not on its margin (the children are transparent
+    # for mouse events, so the click lands on the card button itself)
+    inner_key = card.findChildren(KeyWidget)[2]
+    qtbot.mouseClick(card, qt_api.QtCore.Qt.MouseButton.LeftButton, pos=inner_key.mapTo(card, key_pos(inner_key)))
+    assert vk.tap_dance[2] == (Keycode.deserialize("TD(0)"), 0x1A, 0x08, 0x15, HOST_OS_MARKER)
+    assert w[0].keycode == "TD(0)"
+
+
+def test_entry_card_container_closes_tray(qtbot):
+    """ Clicking the empty area of a card list closes the keycode tray, like switching tabs used to """
+    from widgets.key_widget import KeyWidget
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD, combos=[[0, 0, 0, 0, 0], [4, 5, 6, 7, 8]])
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    combos = find_tab(mw, "Combos").editor
+
+    w = combos.cards[0].findChildren(KeyWidget)
+    qtbot.mouseClick(w[0], qt_api.QtCore.Qt.MouseButton.LeftButton, pos=key_pos(w[0]))
+    assert mw.tray_keycodes.isVisible()
+
+    viewport = combos.container.viewport()
+    empty = viewport.rect().bottomRight() - QPoint(2, 2)
+    qtbot.mouseClick(viewport, qt_api.QtCore.Qt.MouseButton.LeftButton, pos=empty)
+    assert not mw.tray_keycodes.isVisible()
+
+
+def test_layer_buttons_vertical(qtbot):
+    """ The layer buttons are stacked vertically under the "Layer" label, to the left of the keyboard """
+    from PyQt5.QtWidgets import QLabel, QVBoxLayout
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD)
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    ke = mw.keymap_editor
+    buttons = ke.layer_buttons[:4]     # 4 layers on the virtual keyboard; the +/- buttons follow
+
+    assert isinstance(ke.layout_layers, QVBoxLayout)
+    # the buttons are created on connect; give the layout a chance to place them
+    qtbot.waitUntil(lambda: buttons[-1].mapToGlobal(buttons[-1].rect().topLeft()) != buttons[0].mapToGlobal(buttons[0].rect().topLeft()))
+    xs = [b.mapToGlobal(b.rect().topLeft()).x() for b in buttons]
+    ys = [b.mapToGlobal(b.rect().topLeft()).y() for b in buttons]
+    assert len(set(xs)) == 1, "layer buttons must be in one column"
+    assert ys == sorted(ys) and len(set(ys)) == 4, "layer buttons must be stacked top to bottom"
+
+    label = ke.layer_label
+    assert isinstance(label, QLabel) and label.text() == "Layer"
+    assert label.mapToGlobal(label.rect().bottomLeft()).y() <= ys[0]
+
+    # the column sits left of the keyboard
+    kb_x = ke.container.mapToGlobal(ke.container.rect().topLeft()).x()
+    assert xs[0] < kb_x
+
+    # wide buttons: about three times as wide as tall
+    for b in buttons:
+        assert 2.5 <= b.width() / b.height() <= 3.5
+
+
+def test_macro_cards_in_picker(qtbot):
+    """ The Macro picker shows each macro as a card with its first four actions """
+    from types import SimpleNamespace
+    from PyQt5.QtWidgets import QLabel
+    from macro.macro_action import ActionDelay, ActionTap, ActionText
+    from protocol.macro import ProtocolMacro
+    from widgets.entry_card_button import EntryCardButton
+
+    proto = SimpleNamespace(vial_protocol=6)
+    macros = [
+        [ActionText("Hello"), ActionTap(["KC_A", "KC_B"]), ActionDelay(100), ActionText("x"), ActionDelay(5)],
+        [],
+    ]
+    buf = b"\x00".join(ProtocolMacro.macro_serialize(proto, m) for m in macros) + b"\x00"
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD, macro_buffer=buf + b"\x00" * (512 - len(buf)))
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+
+    ak = mw.tray_keycodes.all_keycodes
+    idx = [x for x in range(ak.count()) if ak.tabText(x) == "Macro"][0]
+    cards = {b.text: b for b in ak.widget(idx).findChildren(EntryCardButton)}
+    assert "M0" in cards and "M1" in cards
+
+    assert cards["M0"].header.text() == "M0"
+    assert cards["M0"].lines == ["Text: Hello", "Tap: A + B", "Delay: 100 ms", "Text: x"]
+    shown = [l.text() for l in cards["M0"].findChildren(QLabel) if l is not cards["M0"].header]
+    assert shown == cards["M0"].lines
+    assert cards["M1"].lines == ["\u2014"]
+    # every macro card has the same size, whatever its contents
+    assert cards["M0"].sizeHint() == cards["M1"].sizeHint()
+
+    # editing a macro updates the card
+    kb = mw.autorefresh.current_device.keyboard
+    kb.set_macro(b"\x00".join(ProtocolMacro.macro_serialize(proto, m) for m in [[ActionText("Bye")], []]) + b"\x00")
+    import entry_labels
+    entry_labels.update(kb)
+    cards = {b.text: b for b in ak.widget(idx).findChildren(EntryCardButton)}
+    assert cards["M0"].lines == ["Text: Bye"]

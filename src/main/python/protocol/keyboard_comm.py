@@ -20,6 +20,7 @@ from protocol.constants import CMD_VIA_GET_PROTOCOL_VERSION, CMD_VIA_GET_KEYBOAR
 from protocol.dynamic import ProtocolDynamic
 from protocol.key_override import ProtocolKeyOverride
 from protocol.macro import ProtocolMacro
+import entry_labels
 from protocol.tap_dance import ProtocolTapDance
 from unlocker import Unlocker
 from util import MSG_LEN, hid_send
@@ -101,6 +102,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.reload_keymap()
         self.reload_macros_late()
         self.reload_tap_dance()
+        entry_labels.update(self)
         self.reload_combo()
         self.reload_key_override()
         self.reload_alt_repeat_key()
