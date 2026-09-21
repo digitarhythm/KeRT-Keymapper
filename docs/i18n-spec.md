@@ -107,6 +107,20 @@ Mac / Windows / Linux / Default) も `EntrySummary` コンテキストで訳す�
 - ブラウザ版 (vial-web) は `build.sh` で `translations/` ディレクトリを `usr/local/` にコピーする必要がある
   (別リポジトリ、未対応)。
 
+## 8. ブラウザ版のフォント (2026-09-22 追加)
+
+WebAssembly 版の Qt は OS のフォントを使えず、同梱の欧文フォントしか持たないため、日本語がすべて豆腐
+(□) になる。対策として Noto Sans CJK JP (OFL 1.1) の**サブセット** `web/src/fonts/kert-ja.otf`
+(約 250 KB) を同梱する。
+
+- `web/make_font_subset.py` が、翻訳カタログ (`translations/*.ts`) に現れる文字 + ASCII + Latin-1 記号 +
+  かな + CJK 句読点 + 全角英数 + 矢印などの記号を集め、`fontTools.subset` で切り出す。カタログを変えたら
+  再実行してコミットする (手順はスクリプト冒頭)。
+- `web/src/build.sh` がフォントとライセンスを `usr/local/fonts/` にコピーし、`webmain.py` が
+  `branding_i18n.install_bundled_font(app, get_resource)` で読み込んでアプリ既定フォントにする
+  (ポイントサイズは維持)。デスクトップ版にはこのファイルが無いので何もしない (OS のフォントを使う)。
+- キーボード名など、カタログ外の日本語 (製品名に日本語が含まれる場合等) は対象外で、豆腐になり得る。
+
 ## 7. テスト (`src/main/python/test/test_i18n.py`)
 
 | テスト | 内容 |
@@ -123,3 +137,5 @@ Mac / Windows / Linux / Default) も `EntrySummary` コンテキストで訳す�
 | `test_editor_labels_translated` | GUI: `ja` で起動した MainWindow の Tap Dance / Combos / HostOS / Key Override のラベルとオプション、QMK Settings の設定名、Layer ラベル、Refresh ボタン、Matrix tester のボタン、マクロのメモリ表示が日本語。タブ名 (QMK Settings 内側のタブも) は英語のまま |
 | `test_cards_translated` | GUI: `ja` でピッカーの TD / HOS カードの行ラベルとマクロカードの行頭 (テキスト: など) が日本語 |
 | `test_entry_points_install_translator` | `main.py` と `webmain.py` が `branding_i18n.install(` を呼んでいる |
+| `test_bundled_font_covers_catalog` | `web/src/fonts/kert-ja.otf` が現在のカタログの全文字 + かな等を持つ (fontTools が無ければ skip) |
+| `test_install_bundled_font` | フォントが無ければ None で何もしない。あれば読み込んでアプリ既定フォントの family になり、ポイントサイズは変わらない。`webmain.py` が呼んでいる |

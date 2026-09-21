@@ -23,6 +23,8 @@ cp ../../../src/main/resources/base/qmk_settings.json usr/local
 # KeRT-mapper resources: logo / icon images, the check-mark image and the UI translations
 cp ../../../src/main/resources/base/kert-mapper.png ../../../src/main/resources/base/keyboard-icon.png ../../../src/main/resources/base/check.svg usr/local
 cp -r ../../../src/main/resources/base/translations usr/local/translations
+# Japanese glyphs for the Qt wasm build (subset of Noto Sans CJK JP, see ../make_font_subset.py)
+mkdir -p usr/local/fonts && cp ../fonts/kert-ja.otf ../fonts/OFL.txt usr/local/fonts/
 cp ../../../src/build/settings/base.json usr/local/build_settings.json
 cp -r ../../../src/main/python/* usr/local/lib/python3.11
 cp ../simpleeval.py usr/local/lib/python3.11

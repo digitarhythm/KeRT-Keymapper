@@ -9,8 +9,10 @@ import os
 import xml.etree.ElementTree as ET
 
 from PyQt5.QtCore import QLibraryInfo, QLocale, QTranslator
+from PyQt5.QtGui import QFont, QFontDatabase
 
 LANG_ENV = "KERT_LANG"
+BUNDLED_FONT = "fonts/kert-ja.otf"     # browser build only: the wasm Qt has no system fonts
 CATALOG_PATTERN = "translations/kert_{}.ts"
 APP_ATTR = "kert_translators"
 
@@ -74,3 +76,20 @@ def uninstall(app):
     for translator in getattr(app, APP_ATTR, []):
         app.removeTranslator(translator)
     setattr(app, APP_ATTR, [])
+
+
+def install_bundled_font(app, get_resource, name=BUNDLED_FONT):
+    """Load the bundled UI font (web build) and make it the application font, keeping the point size.
+
+    Returns the font family, or None when the file is not shipped (desktop builds use system fonts)."""
+    path = get_resource(name)
+    if not os.path.exists(path):
+        return None
+    font_id = QFontDatabase.addApplicationFont(path)
+    families = QFontDatabase.applicationFontFamilies(font_id) if font_id >= 0 else []
+    if not families:
+        return None
+    font = QFont(app.font())
+    font.setFamily(families[0])
+    app.setFont(font)
+    return families[0]

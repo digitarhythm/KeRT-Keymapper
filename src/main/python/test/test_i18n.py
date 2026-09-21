@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 from PyQt5.QtCore import QCoreApplication, QLibraryInfo
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QLabel
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -224,3 +225,35 @@ def test_entry_points_install_translator():
     for name in ("main.py", "webmain.py"):
         with open(os.path.join(SRC, name), encoding="utf-8") as inf:
             assert "branding_i18n.install(" in inf.read(), name
+
+
+WEB_FONT = os.path.realpath(os.path.join(SRC, "../../../web/src/fonts/kert-ja.otf"))
+
+
+def test_bundled_font_covers_catalog():
+    fontTools = pytest.importorskip("fontTools.ttLib")
+    sys.path.insert(0, os.path.realpath(os.path.join(SRC, "../../../web")))
+    import make_font_subset
+
+    needed = make_font_subset.needed_chars()
+    assert "タップ" and all(c in needed for c in "タップ・ホールド更新")
+    cmap = fontTools.TTFont(WEB_FONT).getBestCmap()
+    missing = sorted(c for c in needed if ord(c) not in cmap)
+    assert missing == [], "re-run web/make_font_subset.py: missing {}".format("".join(missing)[:40])
+
+
+def test_install_bundled_font(qtbot, tmp_path):
+    import branding_i18n
+    app = QApplication.instance()
+    before = QFont(app.font())
+    assert branding_i18n.install_bundled_font(app, lambda name: str(tmp_path / name)) is None
+    assert app.font().family() == before.family()
+
+    family = branding_i18n.install_bundled_font(app, lambda name: WEB_FONT if name == branding_i18n.BUNDLED_FONT else "")
+    try:
+        assert family == "Noto Sans CJK JP"
+        assert app.font().family() == family and app.font().pointSize() == before.pointSize()
+        with open(os.path.join(SRC, "webmain.py"), encoding="utf-8") as inf:
+            assert "install_bundled_font(" in inf.read()
+    finally:
+        app.setFont(before)

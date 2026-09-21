@@ -73,6 +73,7 @@ def main(app):
     global window
     branding_theme.register()
     branding_i18n.install(app, app.get_resource)
+    branding_i18n.install_bundled_font(app, app.get_resource)
     window = MainWindow(app)
     window.show()
 
