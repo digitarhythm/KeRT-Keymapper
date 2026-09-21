@@ -80,9 +80,10 @@ jobs:
           release/kert-mapper-win-x64.zip
         generate_release_notes: true
 
-  # Windows x64 (AMD64) only
+  # Windows x64 (AMD64) only. windows-2022: since the windows-2025 image 20260907 the VC++ 2012
+  # redistributable no longer leaves msvcr110.dll on the PATH and `fbs freeze` refuses to run.
   build-win:
-    runs-on: windows-2025
+    runs-on: windows-2022
 
     steps:
     - uses: actions/checkout@v4
