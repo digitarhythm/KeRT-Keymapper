@@ -18,6 +18,8 @@ import sys
 
 from main_window import MainWindow
 import branding_theme
+import branding_i18n
+import branding
 
 
 # http://timlehr.com/python-exception-hooks-with-qt-message-box/
@@ -62,7 +64,7 @@ class VialApplicationContext(ApplicationContext):
         # Override the app definition in order to set WM_CLASS.
         result = QtWidgets.QApplication(sys.argv)
         result.setApplicationName(self.build_settings["app_name"])
-        result.setOrganizationDomain("vial.today")
+        result.setOrganizationDomain(branding.APP_ORG_DOMAIN)
 
         #TODO: Qt sets applicationVersion on non-Linux platforms if the exe/pkg metadata is correctly configured.
         # https://doc.qt.io/qt-5/qcoreapplication.html#applicationVersion-prop
@@ -86,6 +88,7 @@ if __name__ == '__main__':
         init_logger()
         qt_exception_hook = UncaughtHook()
         branding_theme.register()
+        branding_i18n.install(appctxt.app, appctxt.get_resource)
         window = MainWindow(appctxt)
         window.show()
         exit_code = appctxt.app.exec_()      # 2. Invoke appctxt.app.exec_()

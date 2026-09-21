@@ -1,6 +1,6 @@
 {
     "categories": "Utility;",
-    "description": "",
+    "description": "Vial-compatible keyboard configurator with HostOS support",
     "author_email": "",
-    "url": ""
+    "url": "https://github.com/digitarhythm/KeRT-mapper"
 }

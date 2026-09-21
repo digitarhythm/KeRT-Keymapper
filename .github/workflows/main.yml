@@ -14,8 +14,8 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: vial-linux
-        path: util/linux-builder/output/Vial-x86_64.AppImage
+        name: kert-mapper-linux
+        path: util/linux-builder/output/KeRT-mapper-x86_64.AppImage
 
   # Native Apple Silicon build with PyInstaller (see util/macos/README.md). macos-15 runners are arm64.
   build-mac-arm64:
@@ -41,13 +41,12 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: vial-mac-arm64
-        path: target/macos-arm64/vial-mac-arm64.dmg
+        name: kert-mapper-mac-arm64
+        path: target/macos-arm64/kert-mapper-mac-arm64.dmg
 
   # On any tag push, publish the macOS (arm64) and Windows (x64) builds as a GitHub Release so that
   # https://github.com/<owner>/<repo>/releases/latest/download/<file> always serves the newest one.
-  # Tags are named after the feature (e.g. os_dance_support) rather than a version, since the fork
-  # keeps upstream's version number.
+  # Tags are versions (v1.0.0, ...); the version in src/build/settings/base.json should match.
   release:
     if: github.ref_type == 'tag'
     needs: [build-mac-arm64, build-win]
@@ -58,27 +57,27 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: vial-mac-arm64
+        name: kert-mapper-mac-arm64
         path: release
 
     - uses: actions/download-artifact@v4
       with:
-        pattern: vial-win*
+        pattern: kert-mapper-win*
         merge-multiple: true
         path: release
 
     - name: Name the Windows files by architecture
       run: |
-        mv release/VialSetup.exe release/vial-win-x64-setup.exe
-        mv release/vial-win.zip release/vial-win-x64.zip
+        mv release/KeRT-mapperSetup.exe release/kert-mapper-win-x64-setup.exe
+        mv release/kert-mapper-win.zip release/kert-mapper-win-x64.zip
         ls -l release
 
     - uses: softprops/action-gh-release@v2
       with:
         files: |
-          release/vial-mac-arm64.dmg
-          release/vial-win-x64-setup.exe
-          release/vial-win-x64.zip
+          release/kert-mapper-mac-arm64.dmg
+          release/kert-mapper-win-x64-setup.exe
+          release/kert-mapper-win-x64.zip
         generate_release_notes: true
 
   # Windows x64 (AMD64) only
@@ -114,12 +113,12 @@ jobs:
       run: |
         . .\venv\Scripts\activate.ps1
         fbs freeze
-        Compress-Archive -Path "target\Vial" -DestinationPath vial-win.zip
+        Compress-Archive -Path "target\KeRT-mapper" -DestinationPath kert-mapper-win.zip
 
     - uses: actions/upload-artifact@v4
       with:
-        name: vial-win
-        path: vial-win.zip
+        name: kert-mapper-win
+        path: kert-mapper-win.zip
 
     - name: Create installer
       run: |
@@ -129,5 +128,5 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: vial-win-installer
-        path: target\VialSetup.exe
+        name: kert-mapper-win-installer
+        path: target\KeRT-mapperSetup.exe

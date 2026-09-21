@@ -11,5 +11,5 @@ pip install -r requirements.txt
 fbs freeze
 fbs installer
 deactivate
-/pkg2appimage-*/pkg2appimage misc/Vial.yml
-mv out/Vial-*.AppImage /output/Vial-x86_64.AppImage
+/pkg2appimage-*/pkg2appimage misc/KeRT-mapper.yml
+mv out/KeRT-mapper-*.AppImage /output/KeRT-mapper-x86_64.AppImage

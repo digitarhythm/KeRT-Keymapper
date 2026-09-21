@@ -7,8 +7,8 @@
 import fbs_runtime._frozen
 
 fbs_runtime._frozen.BUILD_SETTINGS.update({
-    "app_name": "Vial",
-    "author": "xyz",
-    "version": "0.7.5",
-    "mac_bundle_identifier": "today.vial",
+    "app_name": "KeRT-mapper",
+    "author": "digitarhythm",
+    "version": "1.0.0",
+    "mac_bundle_identifier": "io.github.digitarhythm.kert-mapper",
 })

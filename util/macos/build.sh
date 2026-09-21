@@ -31,30 +31,30 @@ fi
 cd "$ROOT"
 mkdir -p "$OUT"
 
-# --- icon: build Vial.icns from the PNGs fbs would have used
-ICONSET="$OUT/Vial.iconset"
+# --- icon: build KeRT-mapper.icns from the PNGs fbs would have used
+ICONSET="$OUT/KeRT-mapper.iconset"
 rm -rf "$ICONSET" && mkdir -p "$ICONSET"
 for size in 16 32 64 128 256 512; do
     sips -z $size $size src/main/icons/mac/1024.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
     double=$((size * 2))
     sips -z $double $double src/main/icons/mac/1024.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$OUT/Vial.icns"
+iconutil -c icns "$ICONSET" -o "$OUT/KeRT-mapper.icns"
 
 # --- freeze
 VIAL_ARCH="$ARCH" "$PY" -m PyInstaller --noconfirm --clean \
     --distpath "$OUT/dist" --workpath "$OUT/build" \
-    util/macos/Vial.spec
+    util/macos/KeRT-mapper.spec
 
 # --- sanity check: the main executable must be the requested architecture
-lipo -archs "$OUT/dist/Vial.app/Contents/MacOS/Vial" | grep -qx "$ARCH"
+lipo -archs "$OUT/dist/KeRT-mapper.app/Contents/MacOS/KeRT-mapper" | grep -qx "$ARCH"
 
 # --- dmg
-DMG="$OUT/vial-mac-$ARCH.dmg"
+DMG="$OUT/kert-mapper-mac-$ARCH.dmg"
 rm -f "$DMG"
-hdiutil create -volname Vial -srcfolder "$OUT/dist/Vial.app" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname KeRT-mapper -srcfolder "$OUT/dist/KeRT-mapper.app" -ov -format UDZO "$DMG" >/dev/null
 
 echo
 echo "arch: $ARCH"
-echo "app:  $OUT/dist/Vial.app"
+echo "app:  $OUT/dist/KeRT-mapper.app"
 echo "dmg:  $DMG"

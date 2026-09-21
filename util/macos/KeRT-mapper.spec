@@ -15,7 +15,7 @@ if ARCH not in ("arm64", "x86_64"):
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 SRC = os.path.join(ROOT, "src", "main", "python")
-ICON = os.path.join(ROOT, "target", "macos-" + ARCH, "Vial.icns")
+ICON = os.path.join(ROOT, "target", "macos-" + ARCH, "KeRT-mapper.icns")
 # PyQt5 5.15.11 wheels: macosx_11_0_arm64 / macosx_10_13_x86_64
 MIN_OS = "11.0" if ARCH == "arm64" else "10.13"
 
@@ -39,7 +39,7 @@ exe = EXE(
     pyz,
     a.scripts,
     exclude_binaries=True,
-    name="Vial",
+    name="KeRT-mapper",
     debug=False,
     strip=False,
     upx=False,
@@ -47,17 +47,17 @@ exe = EXE(
     target_arch=ARCH,
     icon=ICON if os.path.exists(ICON) else None,
 )
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="Vial")
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="KeRT-mapper")
 app = BUNDLE(
     coll,
-    name="Vial.app",
+    name="KeRT-mapper.app",
     icon=ICON if os.path.exists(ICON) else None,
-    bundle_identifier="today.vial",
+    bundle_identifier="io.github.digitarhythm.kert-mapper",
     info_plist={
-        "CFBundleName": "Vial",
-        "CFBundleDisplayName": "Vial",
-        "CFBundleShortVersionString": "0.7.5",
-        "CFBundleVersion": "0.7.5",
+        "CFBundleName": "KeRT-mapper",
+        "CFBundleDisplayName": "KeRT-mapper",
+        "CFBundleShortVersionString": "1.0.0",
+        "CFBundleVersion": "1.0.0",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": MIN_OS,
     },

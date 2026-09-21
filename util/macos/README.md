@@ -1,4 +1,4 @@
-# macOS 版 Vial.app のビルド（Apple Silicon）
+# macOS 版 KeRT-mapper.app のビルド（Apple Silicon）
 
 upstream の CI にある `build-mac` ジョブは Python 3.6.8 と fbs 0.9.0 で `fbs freeze` を実行しており、生成物は x86_64 版のみです。
 Apple Silicon では Rosetta 2 で動きますが、Rosetta 2 は将来の macOS でサポート終了が予告されているため、
@@ -16,13 +16,13 @@ flowchart LR
     end
     subgraph here["util/macos"]
         H1["rthook_fbs_build_settings.py"]
-        H2["Vial.spec の datas"]
+        H2["KeRT-mapper.spec の datas"]
         H3["build.sh の sips + iconutil"]
     end
     F1 -. 同等 .-> H1
     F2 -. 同等 .-> H2
     F3 -. 同等 .-> H3
-    here --> A["target/macos-arm64/vial-mac-arm64.dmg"]
+    here --> A["target/macos-arm64/kert-mapper-mac-arm64.dmg"]
 ```
 
 ## アーキテクチャの決まり方
@@ -34,7 +34,7 @@ arm64 の Mac では作れず、CI でも arm64 しかビルドしていませ�
 
 | 対象 | ビルド環境 | 生成物 |
 |---|---|---|
-| Apple Silicon | arm64 の Python（M1 以降の Mac、`macos-15` ランナー） | `target/macos-arm64/vial-mac-arm64.dmg` |
+| Apple Silicon | arm64 の Python（M1 以降の Mac、`macos-15` ランナー） | `target/macos-arm64/kert-mapper-mac-arm64.dmg` |
 
 ## ローカルでのビルド
 
@@ -57,7 +57,7 @@ util/macos/build.sh
 ```mermaid
 flowchart LR
     P["push / pull_request"] --> A["build-mac-arm64<br/>macos-15"]
-    A --> AA["Artifact: vial-mac-arm64"]
+    A --> AA["Artifact: kert-mapper-mac-arm64"]
     T["tag v* を push"] --> A
     T --> W["build-win<br/>windows-2025 (x64)"]
     AA --> R["release<br/>GitHub Release に添付"]
@@ -91,12 +91,12 @@ git push origin os_dance_support
 
 ## 起動時のプロセスについて
 
-起動すると `Vial` のプロセスが **2つ** 見えます。1つは GUI 本体、もう1つは `multiprocessing` のリソーストラッカー
-（`Vial -c from multiprocessing.resource_tracker import main`）で、これは正常です。
+起動すると `KeRT-mapper` のプロセスが **2つ** 見えます。1つは GUI 本体、もう1つは `multiprocessing` のリソーストラッカー
+（`KeRT-mapper -c from multiprocessing.resource_tracker import main`）で、これは正常です。
 
 `autorefresh_thread.py` が `multiprocessing.RLock` を使っており、Python 3.8 以降の macOS ではこれが
 `sys.executable` で補助プロセスを起動します。凍結アプリでは `sys.executable` がアプリ自身なので、
-`main.py` の先頭で `multiprocessing.freeze_support()` を呼んでいないと **Vial が Vial を無限に起動**します。
+`main.py` の先頭で `multiprocessing.freeze_support()` を呼んでいないと **アプリが自分自身を無限に起動**します。
 `main.py` にはこの呼び出しを入れてあるので、削除しないでください（ソース実行時は何もしない関数です）。
 
 ## 署名について
@@ -105,5 +105,5 @@ git push origin os_dance_support
 Finder で右クリック → 開く、または次を実行してください。
 
 ```bash
-xattr -d com.apple.quarantine /path/to/Vial.app
+xattr -d com.apple.quarantine /path/to/KeRT-mapper.app
 ```

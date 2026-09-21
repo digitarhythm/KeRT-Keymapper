@@ -1,4 +1,7 @@
-### vial-gui
+### KeRT-mapper
+
+KeRT-mapper is a Vial-compatible keyboard configurator with **HostOS** support, forked from
+[vial-kb/vial-gui](https://github.com/vial-kb/vial-gui). Browser version: https://digitarhythm.github.io/vial-web/
 
 # Docs and getting started
 
@@ -60,22 +63,21 @@ and are restored with **Load saved layout**.
 
 Visit https://get.vial.today/ to download a binary release of upstream Vial.
 
-#### Download (this fork)
+#### Download
 
-This fork adds the **HostOS** editor (tap dance slots that send a different keycode per host OS).
-Latest release:
+Latest release (v1.0.0 and later):
 
 | Platform | Download |
 |---|---|
-| macOS, Apple Silicon (M1 and later) | [vial-mac-arm64.dmg](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-mac-arm64.dmg) |
-| Windows, x64 (AMD64) installer | [vial-win-x64-setup.exe](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-win-x64-setup.exe) |
-| Windows, x64 (AMD64) portable | [vial-win-x64.zip](https://github.com/digitarhythm/vial-gui/releases/latest/download/vial-win-x64.zip) |
+| macOS, Apple Silicon (M1 and later) | [kert-mapper-mac-arm64.dmg](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-mac-arm64.dmg) |
+| Windows, x64 (AMD64) installer | [kert-mapper-win-x64-setup.exe](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-win-x64-setup.exe) |
+| Windows, x64 (AMD64) portable | [kert-mapper-win-x64.zip](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-win-x64.zip) |
 
 Intel Macs and 32-bit / ARM Windows are not supported by this fork.
-All releases: https://github.com/digitarhythm/vial-gui/releases
+All releases: https://github.com/digitarhythm/KeRT-mapper/releases
 
-The apps are not code-signed. On macOS, right-click `Vial.app` and choose **Open** on first launch,
-or run `xattr -d com.apple.quarantine /path/to/Vial.app`.
+The apps are not code-signed. On macOS, right-click `KeRT-mapper.app` and choose **Open** on first launch,
+or run `xattr -d com.apple.quarantine /path/to/KeRT-mapper.app`.
 Builds are produced by GitHub Actions; see [`util/macos/README.md`](util/macos/README.md) for how to build the macOS app locally.
 
 #### Development
