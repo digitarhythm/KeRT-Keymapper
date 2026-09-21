@@ -210,9 +210,19 @@ class KeycodeDisplay:
             widget.setMaskColor(None)
 
     @classmethod
+    def live_clients(cls):
+        """Registered clients whose C++ side still exists; the others are dropped.
+
+        Widgets are never unregistered when their window goes away (Python-owned editor widgets die
+        whenever the garbage collector gets to them), so touching a dead one raised RuntimeError."""
+        from PyQt5 import sip
+        cls.clients = [c for c in cls.clients if not sip.isdeleted(c)]
+        return list(cls.clients)
+
+    @classmethod
     def set_keymap_override(cls, override):
         cls.keymap_override = override
-        for client in cls.clients:
+        for client in cls.live_clients():
             client.on_keymap_override()
 
     @classmethod
@@ -230,8 +240,8 @@ class KeycodeDisplay:
             qmk_id = widget.keycode.qmk_id
             if qmk_id in KeycodeDisplay.keymap_override:
                 label = KeycodeDisplay.keymap_override[qmk_id]
-                highlight_color = QApplication.palette().color(QPalette.Link).getRgb()
-                widget.setStyleSheet("QPushButton {color: rgb%s;}" % str(highlight_color))
+                # (color.name(), not "rgb(r, g, b, a)": Qt's CSS parser warns about the alpha value)
+                widget.setStyleSheet("QPushButton {color: %s;}" % QApplication.palette().color(QPalette.Link).name())
             else:
                 label = widget.keycode.label
                 widget.setStyleSheet("QPushButton {}")

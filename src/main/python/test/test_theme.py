@@ -279,6 +279,7 @@ def test_picker_font_smaller(qtbot):
 
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
     quantum = [x for x in range(ak.count()) if ak.tabText(x) == "Quantum"][0]
+    ak.setCurrentIndex(quantum)   # tabs build on first show
     buttons = ak.widget(quantum).findChildren(SquareButton)
     assert buttons
     assert all(b.font().pointSize() == default_pt - 2 for b in buttons)
@@ -303,7 +304,8 @@ def test_picker_block_centered(qtbot):
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     # wide enough for the ANSI display keyboard alternative to be the one shown
-    mw.resize(1700, 1000)
+    mw.resize(1700, 1800)   # portrait: the picker uses the full width (spec §4.5); wide enough for ansi_100
+    qtbot.waitUntil(lambda: mw.height() > mw.width())
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
     basic = ak.widget([x for x in range(ak.count()) if ak.tabText(x) == "Basic"][0])
     qtbot.waitUntil(lambda: any(a.isVisible() and a.kb_display is not None for a in basic.alternatives))
@@ -334,7 +336,9 @@ def test_picker_key_size(qtbot):
     assert KEYCODE_BTN_RATIO == 3.4
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
-    quantum = ak.widget([x for x in range(ak.count()) if ak.tabText(x) == "Quantum"][0])
+    idx = [x for x in range(ak.count()) if ak.tabText(x) == "Quantum"][0]
+    ak.setCurrentIndex(idx)   # tabs build on first show
+    quantum = ak.widget(idx)
     btn = quantum.findChildren(SquareButton)[0]
     expected = round(btn.fontMetrics().height() * KEYCODE_BTN_RATIO) + 2 * key_style.OUTLINE_WIDTH
     assert btn.sizeHint().height() == expected
@@ -365,6 +369,9 @@ def test_picker_block_full_width_without_keyboard(qtbot):
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    mw.resize(900, 1200)   # portrait: full width (a landscape window wraps at its height, spec §4.5)
+    qtbot.waitUntil(lambda: mw.height() > mw.width())
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
     idx = [x for x in range(ak.count()) if ak.tabText(x) == "Layers"][0]
     ak.setCurrentIndex(idx)
@@ -387,7 +394,8 @@ def test_picker_block_centered_without_keyboard(qtbot):
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
-    mw.resize(1700, 1000)
+    mw.resize(1700, 1800)   # portrait: the picker uses the full width (spec §4.5); wide enough for ansi_100
+    qtbot.waitUntil(lambda: mw.height() > mw.width())
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
     idx = [x for x in range(ak.count()) if ak.tabText(x) == "User"][0]
     ak.setCurrentIndex(idx)
@@ -401,3 +409,42 @@ def test_picker_block_centered_without_keyboard(qtbot):
     assert abs(gx(first, first.rect().topLeft()) - gx(alt.block, alt.block.rect().topLeft())) <= 6
     items = [alt.key_layout.itemAt(i).widget() for i in range(alt.key_layout.count())]
     assert len({w.y() for w in items}) == 1, "all User buttons fit in a single row"
+
+
+def test_checkbox_check_mark(qtbot):
+    """ A checked checkbox shows a white check mark on top of its brand-colour background """
+    import os
+    from PyQt5.QtWidgets import QCheckBox, QStyle, QStyleOptionButton
+    from test_gui import prepare, FAKE_KEYBOARD
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD)
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+
+    css = QApplication.instance().styleSheet()
+    checked_rule = css.split("QCheckBox::indicator:checked")[1].split("}")[0]
+    assert 'image: url("' in checked_rule
+    path = checked_rule.split('url("')[1].split('"')[0]
+    assert path.endswith("check.svg") and os.path.exists(path)
+
+    def white_pixels(checked):
+        box = QCheckBox("x", mw)
+        box.setChecked(checked)
+        box.resize(box.sizeHint())
+        box.show()
+        qtbot.waitExposed(box)
+        opt = QStyleOptionButton()
+        box.initStyleOption(opt)
+        ind = box.style().subElementRect(QStyle.SE_CheckBoxIndicator, opt, box)
+        image = box.grab().toImage()
+        inner = ind.adjusted(4, 4, -4, -4)
+        n = sum(1 for x in range(inner.left(), inner.right() + 1) for y in range(inner.top(), inner.bottom() + 1)
+                if QColor(image.pixel(x, y)).lightness() > 200)
+        box.hide()
+        return n, ind
+
+    n_checked, ind = white_pixels(True)
+    n_unchecked, _ = white_pixels(False)
+    assert ind.width() >= 18
+    assert n_checked > 0
+    # unchecked: white background everywhere, checked: mostly brand colour with a white mark
+    assert n_checked < n_unchecked

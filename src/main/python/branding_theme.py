@@ -41,6 +41,16 @@ _registered = False
 
 # spacing between widgets and layout margins, in pixels (same as the line width)
 LAYOUT_SPACING = 3
+# left padding of the keyboard selector's text (stylesheet and DeviceComboBox share it)
+COMBOBOX_PADDING_LEFT = 32
+# check mark drawn over the highlighted background of a checked checkbox (resource "check.svg");
+# set_check_image() stores its absolute path, the stylesheet references it. None = background only.
+CHECK_IMAGE = None
+
+
+def set_check_image(path):
+    global CHECK_IMAGE
+    CHECK_IMAGE = path.replace("\\", "/") if path else None
 
 
 class BrandStyle(QProxyStyle):
@@ -86,7 +96,7 @@ def stylesheet(name):
         }}
         /* keyboard selector: twice the usual space in front of the keyboard name */
         QComboBox {{
-            padding-left: 32px;
+            padding-left: {pl}px;
         }}
         /* keycode picker buttons are sized from the font alone: no inner padding, or labels get clipped */
         SquareButton {{
@@ -123,7 +133,7 @@ def stylesheet(name):
         }}
         QCheckBox::indicator:checked, QGroupBox::indicator:checked {{
             background-color: {hl};
-            border-color: {hl};
+            border-color: {hl};{check}
         }}
         QCheckBox::indicator:disabled, QGroupBox::indicator:disabled {{
             border-color: {disabled};
@@ -133,8 +143,9 @@ def stylesheet(name):
             border-radius: {r}px;
             padding: 4px;
         }}
-    """.format(w=w, mid=mid, r=r, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
-               base=colors[QPalette.Base], disabled=colors[(QPalette.Disabled, QPalette.Text)])
+    """.format(w=w, mid=mid, r=r, pl=COMBOBOX_PADDING_LEFT, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
+               base=colors[QPalette.Base], disabled=colors[(QPalette.Disabled, QPalette.Text)],
+               check='\n            image: url("{}");'.format(CHECK_IMAGE) if CHECK_IMAGE else "")
 
 
 def register():

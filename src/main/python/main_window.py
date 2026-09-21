@@ -36,6 +36,8 @@ from editor.matrix_test import MatrixTest
 
 import themes
 import branding_theme
+import branding
+from widgets.device_combobox import DeviceComboBox
 
 
 # inner margin of the header row (keyboard selector), in pixels
@@ -50,7 +52,7 @@ class MainWindow(QMainWindow):
 
         self.ui_lock_count = 0
 
-        self.settings = QSettings("Vial", "Vial")
+        self.settings = QSettings(branding.APP_ORG, branding.APP_NAME)
         if self.settings.value("size", None):
             self.resize(self.settings.value("size"))
         else:
@@ -66,9 +68,10 @@ class MainWindow(QMainWindow):
             self.showMaximized()
 
         branding_theme.register()
+        branding_theme.set_check_image(appctx.get_resource("check.svg"))
         themes.Theme.set_theme(self.get_theme())
 
-        self.combobox_devices = QComboBox()
+        self.combobox_devices = DeviceComboBox()
         # the keyboard selector is the first thing to read: a larger font and twice the usual height
         font = self.combobox_devices.font()
         font.setPointSize(font.pointSize() + 4)
@@ -278,7 +281,7 @@ class MainWindow(QMainWindow):
             # this fork ships a single theme, so there is nothing to choose from
             self.theme_menu.menuAction().setVisible(False)
 
-        about_vial_act = QAction(tr("MenuAbout", "About Vial..."), self)
+        about_vial_act = QAction(tr("MenuAbout", "About {}...").format(branding.APP_NAME), self)
         about_vial_act.triggered.connect(self.about_vial)
         self.about_keyboard_act = QAction("", self)
         self.about_keyboard_act.triggered.connect(self.about_keyboard)
@@ -335,7 +338,7 @@ class MainWindow(QMainWindow):
 
         self.combobox_devices.clear()
         for dev in devices:
-            self.combobox_devices.addItem(dev.title())
+            self.combobox_devices.add_device(dev)
             if self.autorefresh.current_device and dev.desc["path"] == self.autorefresh.current_device.desc["path"]:
                 self.combobox_devices.setCurrentIndex(self.combobox_devices.count() - 1)
 
@@ -355,14 +358,14 @@ class MainWindow(QMainWindow):
         try:
             self.autorefresh.select_device(self.combobox_devices.currentIndex())
         except ProtocolError:
-            QMessageBox.warning(self, "", "Unsupported protocol version!\n"
-                                          "Please download latest Vial from https://get.vial.today/")
+            QMessageBox.warning(self, "", tr("MainWindow", "Unsupported protocol version!\n"
+                                                           "Please download latest Vial from https://get.vial.today/"))
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):
             keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id
             if (keyboard_id in EXAMPLE_KEYBOARDS) or ((keyboard_id & 0xFFFFFFFFFFFFFF) == EXAMPLE_KEYBOARD_PREFIX):
-                QMessageBox.warning(self, "", "An example keyboard UID was detected.\n"
-                                              "Please change your keyboard UID to be unique before you ship!")
+                QMessageBox.warning(self, "", tr("MainWindow", "An example keyboard UID was detected.\n"
+                                                               "Please change your keyboard UID to be unique before you ship!"))
 
         self.rebuild()
         self.refresh_tabs()
@@ -373,7 +376,7 @@ class MainWindow(QMainWindow):
 
         self.about_keyboard_act.setVisible(False)
         if isinstance(self.autorefresh.current_device, VialKeyboard):
-            self.about_keyboard_act.setText("About {}...".format(self.autorefresh.current_device.title()))
+            self.about_keyboard_act.setText(tr("MainWindow", "About {}...").format(self.autorefresh.current_device.title()))
             self.about_keyboard_act.setVisible(True)
 
         # if unlock process was interrupted, we must finish it first
@@ -484,12 +487,15 @@ class MainWindow(QMainWindow):
         self.current_tab = new_tab
 
     def about_vial(self):
-        title = "About Vial"
-        text = 'Vial {}<br><br>Python {}<br>Qt {}<br><br>' \
+        title = tr("MainWindow", "About {}").format(branding.APP_NAME)
+        text = '{} {}<br>{}<br><br>Python {}<br>Qt {}<br><br>' \
                'Licensed under the terms of the<br>GNU General Public License (version 2 or later)<br><br>' \
-               '<a href="https://get.vial.today/">https://get.vial.today/</a>' \
-               .format(qApp.applicationVersion(),
-                       platform.python_version(), QT_VERSION_STR)
+               '<a href="{}">{}</a><br><br>' \
+               'Based on {} — <a href="{}">{}</a>' \
+               .format(branding.APP_NAME, qApp.applicationVersion(), branding.APP_DESCRIPTION,
+                       platform.python_version(), QT_VERSION_STR,
+                       branding.APP_URL, branding.APP_URL,
+                       branding.UPSTREAM_NAME, branding.UPSTREAM_URL, branding.UPSTREAM_URL)
 
         if sys.platform == "emscripten":
             self.msg_about = QMessageBox()

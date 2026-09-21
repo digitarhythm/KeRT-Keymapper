@@ -11,6 +11,10 @@ from themes import Theme
 import key_style
 
 
+# auto-fit never goes below this scale (a too small window scrolls/clips instead of vanishing keys)
+MIN_FIT_SCALE = 0.3
+
+
 class KeyWidget:
 
     def __init__(self, desc, scale, shift_x=0, shift_y=0):
@@ -280,6 +284,9 @@ class KeyboardWidget(QWidget):
         self.width = self.height = 0
         self.active_key = None
         self.active_mask = False
+        # fit mode (KeymapEditor auto-fit): the layout may give this widget less than its size hint,
+        # the editor then rescales the keys to what it got instead of forcing the window to grow
+        self.fit_mode = False
 
     def set_keys(self, keys, encoders):
         self.common_widgets = []
@@ -493,8 +500,32 @@ class KeyboardWidget(QWidget):
 
         qp.end()
 
-    def minimumSizeHint(self):
+    def sizeHint(self):
         return QSize(self.width, self.height)
+
+    def minimumSizeHint(self):
+        if self.fit_mode:
+            return QSize(0, 0)
+        return QSize(self.width, self.height)
+
+    def content_size(self):
+        """(width, height) of the key area at scale 1, without padding"""
+        max_w = max_h = 0
+        for key in self.widgets:
+            p = key.polygon.boundingRect().bottomRight()
+            max_w = max(max_w, p.x())
+            max_h = max(max_h, p.y())
+        return max_w, max_h
+
+    def fit_scale(self, width, height, max_scale=None):
+        """Largest scale at which every key (plus padding) fits into width x height; None without keys"""
+        w, h = self.content_size()
+        if w <= 0 or h <= 0:
+            return None
+        scale = min((width - 2 * self.padding) / w, (height - 2 * self.padding) / h)
+        if max_scale is not None:
+            scale = min(scale, max_scale)
+        return max(scale, MIN_FIT_SCALE)
 
     def hit_test(self, pos):
         """ Returns key, hit_masked_part """

@@ -54,11 +54,13 @@ class AlternativeDisplay(QWidget):
         self.block.setLayout(block_layout)
 
         # the block is centred with stretches; its width is fixed in update_block_width()
+        self.wrap_width = None
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.addStretch(1)
         row.addWidget(self.block)
         row.addStretch(1)
+        self.row = row
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(row)
@@ -78,6 +80,23 @@ class AlternativeDisplay(QWidget):
             width += item.sizeHint().width() + spacing
         return width
 
+    def available_width(self):
+        """Width of the enclosing scroll area's viewport (the tab page). Our own width is not usable
+        here: it follows the block width we set (through the scroll area's content minimum), so
+        basing the block on it makes two displays in one tab resize each other forever."""
+        w = self.parentWidget()
+        while w is not None and not isinstance(w, QScrollArea):
+            w = w.parentWidget()
+        width = w.viewport().width() if w is not None else self.width()
+        if self.wrap_width:
+            width = min(width, self.wrap_width)
+        return width
+
+    def set_wrap_width(self, wrap_width):
+        """Limit the (centred, left-aligned inside) block to wrap_width pixels; None = full width"""
+        self.wrap_width = wrap_width
+        self.update_block_width()
+
     def update_block_width(self):
         """Keyboard tabs: as wide as the display keyboard. Other tabs: as wide as one row of buttons,
         or the full width when they need to wrap. Either way the block is centred and its contents
@@ -85,7 +104,7 @@ class AlternativeDisplay(QWidget):
         if self.kb_display:
             width = self.kb_display.sizeHint().width()
         else:
-            width = min(self.width(), max(self.flow_row_width(), 1))
+            width = min(self.available_width(), max(self.flow_row_width(), 1))
         if width > 0 and self.block.width() != width:
             self.block.setFixedWidth(width)
 
@@ -142,12 +161,17 @@ class Tab(QScrollArea):
         self.layout = QVBoxLayout()
         self.layout.setContentsMargins(0, 0, 0, 0)
 
+        # The alternative displays (display keyboard + keycode buttons) are built on first show only:
+        # a MainWindow has four pickers x eleven tabs of them, and building all of that up front took
+        # most of the startup time (docs/picker-lazy-build-spec.md).
+        self.alts = alts
+        self.prefix_buttons = prefix_buttons
         self.alternatives = []
-        for kb, keys in alts:
-            alt = AlternativeDisplay(kb, keys, prefix_buttons)
-            alt.keycode_changed.connect(self.keycode_changed)
-            self.layout.addWidget(alt)
-            self.alternatives.append(alt)
+        self.keycode_filter = keycode_filter_any
+        self.wrap_width = None
+        self.built = False
+        self.dirty = True
+        self.suspended = False    # set while the tab widget shuffles pages around (see recreate_keycode_buttons)
 
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -157,10 +181,45 @@ class Tab(QScrollArea):
         w.setLayout(self.layout)
         self.setWidget(w)
 
-    def recreate_buttons(self, keycode_filter):
+    def would_have_buttons(self, keycode_filter):
+        """Whether any keycode of this tab passes the filter: decides the tab's presence without widgets"""
+        return any(not kc.hidden and keycode_filter(kc.qmk_id) for _, keycodes in self.alts for kc in keycodes)
+
+    def invalidate(self, keycode_filter):
+        """Remember the filter and rebuild now if the tab is on screen, otherwise on the next show"""
+        self.keycode_filter = keycode_filter
+        self.dirty = True
+        if self.isVisible():
+            self.ensure_built()
+
+    def ensure_built(self):
+        if not self.dirty or self.suspended:
+            return
+        if not self.alternatives:
+            for kb, keys in self.alts:
+                alt = AlternativeDisplay(kb, keys, self.prefix_buttons)
+                alt.keycode_changed.connect(self.keycode_changed)
+                alt.set_wrap_width(self.wrap_width)
+                self.layout.addWidget(alt)
+                self.alternatives.append(alt)
         for alt in self.alternatives:
-            alt.recreate_buttons(keycode_filter)
-        self.setVisible(self.has_buttons())
+            alt.recreate_buttons(self.keycode_filter)
+        self.built = True
+        self.dirty = False
+        self.select_alternative()
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        self.ensure_built()
+
+    def set_wrap_width(self, wrap_width):
+        self.wrap_width = wrap_width
+        for alt in self.alternatives:
+            alt.set_wrap_width(wrap_width)
+        self.select_alternative()
+
+    def recreate_buttons(self, keycode_filter):
+        self.invalidate(keycode_filter)
 
     def relabel_buttons(self):
         for alt in self.alternatives:
@@ -178,8 +237,11 @@ class Tab(QScrollArea):
             alt.hide()
 
         # then display first alternative which fits on screen w/o horizontal scroll
+        available = self.width() - self.verticalScrollBar().width()
+        if self.wrap_width:
+            available = min(available, self.wrap_width)
         for alt in self.alternatives:
-            if self.width() - self.verticalScrollBar().width() > alt.required_width():
+            if available > alt.required_width():
                 alt.show()
                 break
 
@@ -253,19 +315,33 @@ class FilteredTabbedKeycodes(QTabWidget):
 
     def recreate_keycode_buttons(self):
         prev_tab = self.tabText(self.currentIndex()) if self.currentIndex() >= 0 else ""
+        # removing / adding pages makes each of them "current" (and shown) for a moment; no page may
+        # build itself during that shuffle, only the one that ends up current
+        for tab in self.tabs:
+            tab.suspended = True
         while self.count() > 0:
             self.removeTab(0)
 
         for tab in self.tabs:
-            tab.recreate_buttons(self.keycode_filter)
-            if tab.has_buttons():
+            tab.invalidate(self.keycode_filter)
+            if tab.would_have_buttons(self.keycode_filter):
                 self.addTab(tab, tr("TabbedKeycodes", tab.label))
                 if tab.label == prev_tab:
                     self.setCurrentIndex(self.count() - 1)
+            else:
+                tab.hide()
+        for tab in self.tabs:
+            tab.suspended = False
+        if self.isVisible() and self.currentWidget() is not None:
+            self.currentWidget().ensure_built()
 
     def on_keymap_override(self):
         for tab in self.tabs:
             tab.relabel_buttons()
+
+    def set_wrap_width(self, wrap_width):
+        for tab in self.tabs:
+            tab.set_wrap_width(wrap_width)
 
 
 class TabbedKeycodes(QWidget):
@@ -278,6 +354,7 @@ class TabbedKeycodes(QWidget):
 
         self.target = None
         self.is_tray = False
+        self.wrap_width = None
 
         self.layout = QVBoxLayout()
 
@@ -290,6 +367,12 @@ class TabbedKeycodes(QWidget):
 
         self.setLayout(self.layout)
         self.set_keycode_filter(keycode_filter_any)
+
+    def hasHeightForWidth(self):
+        # The flow layouts inside (thousands of keycode buttons) would be laid out again in Python for every
+        # height-for-width query of the enclosing layouts / splitter, which stalls the UI for seconds.
+        # The picker's height is decided by the Keymap splitter, not by its content.
+        return False
 
     @classmethod
     def set_tray(cls, tray):
@@ -328,6 +411,12 @@ class TabbedKeycodes(QWidget):
     def recreate_keycode_buttons(self):
         for opt in [self.all_keycodes, self.basic_keycodes]:
             opt.recreate_keycode_buttons()
+
+    def set_wrap_width(self, wrap_width):
+        """Wrap the pickers' contents at wrap_width pixels (None: full width); the block stays centred"""
+        self.wrap_width = wrap_width
+        for opt in [self.all_keycodes, self.basic_keycodes]:
+            opt.set_wrap_width(wrap_width)
 
     def set_keycode_filter(self, keycode_filter):
         if keycode_filter == keycode_filter_masked:
