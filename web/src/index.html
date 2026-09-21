@@ -74,7 +74,7 @@ body {
 
 <div id="startup">
     <div id="startup_inner">
-        <input id="startup_btn" type="button" onclick="connect()" value="Start KeRT-mapper" disabled="true" /><br>
+        <input id="startup_btn" type="button" onclick="connect()" value="Exec KeRT-mapper" disabled="true" /><br>
         <div id="error" style="display:none">
             <p id="error_msg"></p>
             <p>You can check web browser support at <a href="https://caniuse.com/webhid" target="_blank">caniuse.com</a>.<br>
@@ -211,12 +211,21 @@ body {
         btn.value = "Requesting device list...";
         devices = await navigator.hid.requestDevice({filters: [{usagePage: 0xFF60, usage: 0x61}]});
         if (devices.length != 1) {
-            btn.value = "Start KeRT-mapper";
+            btn.value = "Exec KeRT-mapper";
             btn.disabled = false;
             return;
         }
         btn.value = "Connecting to the device...";
-        await devices[0].open();
+        try {
+            await devices[0].open();
+        } catch (err) {
+            // typically: another program (e.g. the desktop app) has the keyboard open
+            document.getElementById("error_msg").innerText =
+                "Could not open the device: " + err.message + ". Close other programs that use the keyboard and try again.";
+            btn.value = "Exec KeRT-mapper";
+            btn.disabled = false;
+            return;
+        }
         devices[0].oninputreport = function(ev) {
             clearTimeout(g_read_timeout);
             var ptr = _malloc(32);
