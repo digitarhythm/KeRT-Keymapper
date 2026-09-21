@@ -1,7 +1,7 @@
 ### KeRT-mapper
 
 KeRT-mapper is a Vial-compatible keyboard configurator with **HostOS** support, forked from
-[vial-kb/vial-gui](https://github.com/vial-kb/vial-gui). Browser version: https://digitarhythm.github.io/KeRT-mapper-web/
+[vial-kb/vial-gui](https://github.com/vial-kb/vial-gui). Browser version: https://digitarhythm.github.io/KeRT-mapper/
 
 # Docs and getting started
 

@@ -1,0 +1,48 @@
+name: Web
+
+# Browser version (web/): built with emscripten and published to GitHub Pages at
+# https://digitarhythm.github.io/KeRT-mapper/ on every version tag, or on demand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: |
+        cd web
+        git clone --depth 1 https://github.com/vial-kb/via-keymap-precompiled.git
+        ./fetch-emsdk.sh
+        ./fetch-deps.sh
+        ./build-deps.sh
+        cd src
+        ./build.sh
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: kert-mapper-web
+        path: web/src/build
+
+    - uses: actions/upload-pages-artifact@v3
+      with:
+        path: web/src/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - id: deployment
+      uses: actions/deploy-pages@v4
