@@ -204,8 +204,28 @@ def prepare(qtbot, keyboard_json, combos=None, tap_dance=None, macro_buffer=None
     from PyQt5 import sip
     from util import KeycodeDisplay
 
-    # qtbot deletes the previous test's MainWindow via deleteLater(); once the event loop has run, its
-    # TabbedKeycodes are gone on the C++ side but still registered here, so drop them before building a new one
+    # Tear down the previous tests' MainWindows before building a new one. Keeping them alive made every
+    # later test slower (each keycode relabel walked the pickers of every window built so far, tens of
+    # thousands of buttons), so the whole suite crawled. Close + deleteLater + a processEvents() pass frees
+    # them; the KeycodeDisplay clients that died with them are pruned so nothing touches a deleted widget.
+    from PyQt5.QtCore import QEvent
+    from PyQt5.QtWidgets import QApplication
+    for old in all_mw:
+        if not sip.isdeleted(old):
+            old.close()
+            old.deleteLater()
+    all_mw.clear()
+    # processEvents() alone never runs deferred deletes posted from an outer event-loop level; a few rounds,
+    # because destructors and close handlers post further deleteLater() calls of their own
+    for _ in range(5):
+        QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        QApplication.processEvents()
+    # Python-owned editor widgets (entries built before they get a parent) die when the collector
+    # frees the old window's Python objects; do that now rather than at a random later point
+    import gc
+    gc.collect()
+    QApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QApplication.processEvents()
     KeycodeDisplay.clients = [c for c in KeycodeDisplay.clients if not sip.isdeleted(c)]
 
     vk = VirtualKeyboard(keyboard_json, combos=combos, tap_dance=tap_dance, macro_buffer=macro_buffer)
@@ -787,6 +807,7 @@ def test_entry_cards_in_picker(qtbot):
     def picker_buttons(tab_label):
         ak = mw.tray_keycodes.all_keycodes
         idx = [x for x in range(ak.count()) if ak.tabText(x) == tab_label][0]
+        ak.widget(idx).ensure_built()   # tabs build on first show; the tray is not open here
         return {b.text: b for b in ak.widget(idx).findChildren(EntryCardButton)}
 
     def card_keys(btn):
@@ -916,6 +937,7 @@ def test_macro_cards_in_picker(qtbot):
 
     ak = mw.tray_keycodes.all_keycodes
     idx = [x for x in range(ak.count()) if ak.tabText(x) == "Macro"][0]
+    ak.widget(idx).ensure_built()   # tabs build on first show; the tray is not open here
     cards = {b.text: b for b in ak.widget(idx).findChildren(EntryCardButton)}
     assert "M0" in cards and "M1" in cards
 
