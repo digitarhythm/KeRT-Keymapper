@@ -151,7 +151,7 @@ class MacroRecorder(BasicEditor):
 
         data = self.serialize()
         memory = len(data)
-        self.lbl_memory.setText("Memory used by macros: {}/{}".format(memory, self.keyboard.macro_memory))
+        self.lbl_memory.setText(tr("MacroRecorder", "Memory used by macros: {}/{}").format(memory, self.keyboard.macro_memory))
         self.btn_save.setEnabled(data != self.keyboard.macro and memory <= self.keyboard.macro_memory)
         self.lbl_memory.setStyleSheet("QLabel { color: red; }" if memory > self.keyboard.macro_memory else "")
         self.update_tab_titles()

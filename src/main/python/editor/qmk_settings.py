@@ -25,7 +25,7 @@ class GenericOption(QObject):
         self.qsid = self.option["qsid"]
         self.container = container
 
-        self.lbl = QLabel(option["title"])
+        self.lbl = QLabel(tr("QmkSettings", option["title"]))   # titles come from qmk_settings.json
         self.container.addWidget(self.lbl, self.row, 0)
 
     def reload(self, keyboard):

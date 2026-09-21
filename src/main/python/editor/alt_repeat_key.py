@@ -72,9 +72,9 @@ class OptionsUI(QWidget):
 
         container = QVBoxLayout()
 
-        self.opt_default_to_this_alt_key = CheckBoxNoPadding("Default to this alt key")
-        self.opt_bidirectional = CheckBoxNoPadding("Bidirectional")
-        self.opt_ignore_mod_handedness = CheckBoxNoPadding("Ignore mod handedness")
+        self.opt_default_to_this_alt_key = CheckBoxNoPadding(tr("AltRepeatKey", "Default to this alt key"))
+        self.opt_bidirectional = CheckBoxNoPadding(tr("AltRepeatKey", "Bidirectional"))
+        self.opt_ignore_mod_handedness = CheckBoxNoPadding(tr("AltRepeatKey", "Ignore mod handedness"))
 
         for w in [self.opt_default_to_this_alt_key, self.opt_bidirectional,
                   self.opt_ignore_mod_handedness]:
@@ -131,19 +131,19 @@ class AltRepeatKeyEntryUI(QObject):
         self.w2 = make_scrollable(l)
 
     def populate_container(self):
-        self.container.addWidget(QLabel("Enable"), 0, 0)
+        self.container.addWidget(QLabel(tr("AltRepeatKey", "Enable")), 0, 0)
         self.container.addWidget(self.enable_chk, 0, 1)
 
-        self.container.addWidget(QLabel("Last key"), 2, 0)
+        self.container.addWidget(QLabel(tr("AltRepeatKey", "Last key")), 2, 0)
         self.container.addWidget(self.last_key, 2, 1)
 
-        self.container.addWidget(QLabel("Alt key"), 3, 0)
+        self.container.addWidget(QLabel(tr("AltRepeatKey", "Alt key")), 3, 0)
         self.container.addWidget(self.alt_key, 3, 1)
 
-        self.container.addWidget(QLabel("Allowed mods"), 4, 0)
+        self.container.addWidget(QLabel(tr("AltRepeatKey", "Allowed mods")), 4, 0)
         self.container.addWidget(self.allowed_mods, 4, 1)
 
-        self.container.addWidget(QLabel("Options"), 5, 0)
+        self.container.addWidget(QLabel(tr("AltRepeatKey", "Options")), 5, 0)
         self.container.addWidget(self.options, 5, 1)
 
     def widget(self):

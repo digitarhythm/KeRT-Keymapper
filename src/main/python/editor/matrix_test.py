@@ -22,8 +22,8 @@ class MatrixTest(BasicEditor):
         self.keyboardWidget = KeyboardWidget(layout_editor)
         self.keyboardWidget.set_enabled(False)
 
-        self.unlock_btn = QPushButton("Unlock")
-        self.reset_btn = QPushButton("Reset")
+        self.unlock_btn = QPushButton(tr("MatrixTest", "Unlock"))
+        self.reset_btn = QPushButton(tr("MatrixTest", "Reset"))
 
         layout = QVBoxLayout()
         layout.addWidget(self.keyboardWidget)

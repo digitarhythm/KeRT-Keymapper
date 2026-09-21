@@ -11,6 +11,7 @@ from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
 from widgets.entry_card import EntryCard, EntryCardContainer
 import entry_labels
+from util import tr
 
 # 事前生成するエントリUIの上限
 MAX_HOST_OS_ENTRIES = 32
@@ -59,7 +60,8 @@ class HostOSEntryUI(QObject):
     def populate_container(self):
         self.container.setVerticalSpacing(3)
         self.kc_fields = []
-        for row, label in enumerate(["Mac", "Win", "Linux", "Default"]):
+        labels = [tr("HostOS", "Mac"), tr("HostOS", "Win"), tr("HostOS", "Linux"), tr("HostOS", "Default")]
+        for row, label in enumerate(labels):
             self.container.addWidget(QLabel(label), row, 0)
             kc = KeyWidget()
             kc.set_scale(CARD_KEY_SCALE)
@@ -126,9 +128,8 @@ class HostOS(BasicEditor):
         for x, e in enumerate(self.host_os_entries):
             e.set_td_idx(self.host_os_base() + x)
             self.cards[x].set_title("HOS({})".format(x))
-        self.hint.setText(
-            "Use <code>HOS(n)</code> (HostOS tab) to place a HostOS key in the keymap."
-            " Leave a field empty to fall back to Default.")
+        self.hint.setText(tr("HostOS", "Use <code>HOS(n)</code> (HostOS tab) to place a HostOS key in the keymap."
+                                        " Leave a field empty to fall back to Default."))
         self.container.set_cards(self.cards)
         self.reload_ui()
 

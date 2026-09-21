@@ -8,6 +8,7 @@ from widgets.key_widget import KeyWidget
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
 from widgets.entry_card import EntryCard, EntryCardContainer
+from util import tr
 
 # キーの描画倍率。カード内では通常より小さく描いて行間を詰める
 CARD_KEY_SCALE = 0.7
@@ -41,14 +42,14 @@ class ComboEntryUI(QObject):
             kc_widget = KeyWidget()
             kc_widget.set_scale(CARD_KEY_SCALE)
             kc_widget.changed.connect(self.on_key_changed)
-            self.container.addWidget(QLabel("Key {}".format(x + 1)), x, 0)
+            self.container.addWidget(QLabel(tr("Combos", "Key {}").format(x + 1)), x, 0)
             self.container.addWidget(kc_widget, x, 1)
             self.kc_inputs.append(kc_widget)
 
         self.kc_output = KeyWidget()
         self.kc_output.set_scale(CARD_KEY_SCALE)
         self.kc_output.changed.connect(self.on_key_changed)
-        self.container.addWidget(QLabel("Output key"), 4, 0)
+        self.container.addWidget(QLabel(tr("Combos", "Output key")), 4, 0)
         self.container.addWidget(self.kc_output, 4, 1)
 
     def widget(self):
@@ -95,7 +96,7 @@ class Combos(BasicEditor):
             entry.key_changed.connect(self.on_key_changed)
             self.combo_entries_available.append(entry)
             card = EntryCard(entry.widget())
-            card.set_title("Combo {}".format(x + 1))
+            card.set_title(tr("Combos", "Combo {}").format(x + 1))
             self.cards_available.append(card)
 
         self.addWidget(self.container)
