@@ -103,13 +103,16 @@ jobs:
         if ((Get-FileHash nsis-3.06.1-setup.exe -Algorithm sha256).Hash -ne "f60488a676308079bfdf6845dc7114cfd4bbff47b66be4db827b89bb8d7fdc52") { Write-Error 'SHA256 mismatch' }
         Start-Process -FilePath "nsis-3.06.1-setup.exe" -ArgumentList "/S", "/D=C:\Program Files (x86)\NSIS" -NoNewWindow -Wait
 
-    # fbs freeze copies msvcr110.dll / msvcp110.dll (VC++ 2012) into the frozen app and aborts when they
-    # are not on the PATH. The download.microsoft.com package upstream used no longer installs them on
-    # the current runner images (2026-09), so take the redistributable from Chocolatey instead.
-    - name: Install Visual C++ 2012 Redistributable
+    # fbs freeze copies msvcr100.dll (VC++ 2010) and msvcr110.dll / msvcp110.dll (VC++ 2012) into the
+    # frozen app and aborts when they are not on the PATH. The runner images of 2026-09 no longer ship
+    # them and the download.microsoft.com package upstream used does not install them any more, so take
+    # both redistributables from Chocolatey.
+    - name: Install Visual C++ 2010 and 2012 Redistributables
       run: |
-        choco install vcredist2012 -y --no-progress
-        if (-not (Test-Path "$env:SystemRoot\System32\msvcr110.dll")) { throw "msvcr110.dll still missing" }
+        choco install vcredist2010 vcredist2012 -y --no-progress
+        foreach ($dll in "msvcr100.dll", "msvcr110.dll", "msvcp110.dll") {
+          if (-not (Test-Path "$env:SystemRoot\System32\$dll")) { throw "$dll still missing" }
+        }
 
     - name: Build
       run: |
