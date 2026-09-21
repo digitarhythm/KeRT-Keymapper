@@ -20,6 +20,7 @@ import glob
 import os
 import subprocess
 import sys
+import unicodedata
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -51,7 +52,8 @@ def needed_chars(translations_dir=TRANSLATIONS):
     chars = catalog_chars(translations_dir) | set(FIXED_CHARS)
     for lo, hi in FIXED_RANGES:
         chars |= {chr(c) for c in range(lo, hi + 1)}
-    return {c for c in chars if not c.isspace() or c == " "}
+    # drop unassigned code points inside the ranges (they have no glyph anywhere) and control characters
+    return {c for c in chars if unicodedata.category(c) not in ("Cn", "Cc") and (not c.isspace() or c == " ")}
 
 
 def main(argv):
