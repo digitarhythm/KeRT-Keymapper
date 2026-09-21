@@ -29,9 +29,23 @@ body {
     align-items: center;
     text-align: center;
 }
+/* the start button looks like the cards inside the app: 10px corners, 3px #303030 frame, KeRT green */
 #startup_btn {
     font-size: 250%;
-    padding: 1em;
+    padding: 0.5em 1em;
+    color: #ffffff;
+    background-color: #00a3a3;
+    border: 3px solid #303030;
+    border-radius: 10px;
+    cursor: pointer;
+}
+#startup_btn:hover:enabled {
+    background-color: #00b8b8;
+}
+#startup_btn:disabled {
+    color: #ffffff;
+    opacity: 0.75;
+    cursor: default;
 }
 #version {
     position: absolute;
