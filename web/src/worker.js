@@ -1,12 +1,31 @@
-var old_msg = self.onmessage;
+// emscripten renamed allocateUTF8 to stringToNewUTF8 (3.1.35+); support both
+function kert_c_string(s) {
+    return (typeof stringToNewUTF8 === "function") ? stringToNewUTF8(s) : allocateUTF8(s);
+}
 
-self.onmessage = function(e) {
+// The page starts Python with a {cmd: "py"} message to this (the main program's) worker.
+function kert_handle_message(e, original) {
     if (e.data.cmd == "py") {
-        _PyRun_SimpleString(allocateUTF8(e.data.payload));
+        try {
+            _PyRun_SimpleString(kert_c_string(e.data.payload));
+        } catch (ex) {
+            // never leave the page waiting with a spinner: report the failure
+            postMessage({cmd: "fatal_error", msg: "Python start failed: " + ex});
+            throw ex;
+        }
     } else {
-        old_msg(e);
+        original(e);
     }
 }
+
+if (typeof handleMessage === "function") {
+    // emscripten 3.1.4x+: the worker re-installs its own handleMessage as self.onmessage once the module is
+    // loaded, which would drop a wrapper put on self.onmessage now; wrap the function itself instead
+    var kert_original_handle = handleMessage;
+    handleMessage = function (e) { kert_handle_message(e, kert_original_handle); };
+}
+var old_msg = self.onmessage;
+self.onmessage = function (e) { kert_handle_message(e, old_msg); };
 
 function vialgluejs_write_device(data) {
     var buf = [];

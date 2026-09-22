@@ -267,16 +267,21 @@ class KeyOverride(BasicEditor):
         self.key_override_entries = []
         self.key_override_entries_available = []
         self.tabs = TabWidgetWithKeycodes()
-        for x in range(128):
-            entry = KeyOverrideEntryUI(x)
-            entry.changed.connect(self.on_change)
-            self.key_override_entries_available.append(entry)
+        # entries are created on demand (ensure_entries), as many as the keyboard has
 
         self.addWidget(self.tabs)
+
+    def ensure_entries(self, count):
+        """Create entry widgets until `count` exist; at most 128."""
+        while len(self.key_override_entries_available) < min(count, 128):
+            entry = KeyOverrideEntryUI(len(self.key_override_entries_available))
+            entry.changed.connect(self.on_change)
+            self.key_override_entries_available.append(entry)
 
     def rebuild_ui(self):
         while self.tabs.count() > 0:
             self.tabs.removeTab(0)
+        self.ensure_entries(self.keyboard.key_override_count)
         self.key_override_entries = self.key_override_entries_available[:self.keyboard.key_override_count]
         for x, e in enumerate(self.key_override_entries):
             self.tabs.addTab(e.widget(), str(x + 1))

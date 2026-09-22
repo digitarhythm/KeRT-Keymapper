@@ -1,7 +1,7 @@
-# KeRT-mapper リブランディング計画
+# KeRT-Keymapper リブランディング計画
 
 作成日: 2026-09-20
-対象リポジトリ: `digitarhythm/vial-gui`（→ `digitarhythm/KeRT-mapper`）
+対象リポジトリ: `digitarhythm/vial-gui`（→ `digitarhythm/KeRT-mapper`、2026-09-22 → `digitarhythm/KeRT-Keymapper`）
 フォーク元: [vial-kb/vial-gui](https://github.com/vial-kb/vial-gui)（GPL-2.0）
 
 ## 1. 目的
@@ -14,7 +14,7 @@
 
 ## 2. 名称と識別子
 
-プロダクト名: **KeRT-mapper**
+プロダクト名: **KeRT-Keymapper**
 
 由来は自作キーボード **TReK**（Triple Rotary encoder Keyboard）を逆綴りにした `KeRT` と、
 `mapper`（Key ReMapper）の組み合わせ。`TReK` を1文字ずつ反転すると大文字小文字ごと `KeRT` になる。
@@ -23,9 +23,9 @@
 
 | 確認先 | 結果 |
 |---|---|
-| GitHub `kert-mapper in:name` | 0件 |
-| `digitarhythm/KeRT-mapper` | 未使用（404） |
-| PyPI `kert-mapper` | 未使用（404） |
+| GitHub `kert-keymapper in:name` | 0件 |
+| `digitarhythm/KeRT-Keymapper` | 未使用（404） |
+| PyPI `kert-keymapper` | 未使用（404） |
 
 ハイフンは Debian パッケージ名（英小文字・数字・`+`・`-`・`.`）でも
 macOS バンドルID（英数字・ハイフン・ピリオド）でも正式に許可された区切り文字であり、
@@ -35,19 +35,19 @@ macOS バンドルID（英数字・ハイフン・ピリオド）でも正式に
 
 | 用途 | 現在 | 変更後 |
 |---|---|---|
-| アプリ表示名 | `Vial` | `KeRT-mapper` |
+| アプリ表示名 | `Vial` | `KeRT-Keymapper` |
 | author | `xyz` | `digitarhythm` |
-| GitHub リポジトリ | `vial-gui` | `KeRT-mapper` |
-| macOS バンドルID | `today.vial` | `io.github.digitarhythm.kert-mapper` |
-| macOS アプリ | `Vial.app` | `KeRT-mapper.app` |
-| Debian パッケージ / `.desktop` | `Vial` | `kert-mapper` |
-| AppImage | `Vial-x86_64.AppImage` | `KeRT-mapper-x86_64.AppImage` |
-| QSettings | `QSettings("Vial", "Vial")` | `QSettings("digitarhythm", "KeRT-mapper")` |
+| GitHub リポジトリ | `vial-gui` | `KeRT-Keymapper`（当初 `KeRT-mapper`） |
+| macOS バンドルID | `today.vial` | `io.github.digitarhythm.kert-keymapper` |
+| macOS アプリ | `Vial.app` | `KeRT-Keymapper.app` |
+| Debian パッケージ / `.desktop` | `Vial` | `kert-keymapper` |
+| AppImage | `Vial-x86_64.AppImage` | `KeRT-Keymapper-x86_64.AppImage` |
+| QSettings | `QSettings("Vial", "Vial")` | `QSettings("digitarhythm", "KeRT-Keymapper")` |
 | バージョン | `0.7.5` | **未決定**（第11章参照） |
 
 機能はリポジトリの説明文と About ダイアログが担う。説明文の案:
 
-> KeRT-mapper — Vial-compatible keyboard configurator with HostOS support.
+> KeRT-Keymapper — Vial-compatible keyboard configurator with HostOS support.
 > Remap keys per host OS (macOS / Windows / Linux).
 
 ## 3. 変更方針：3分類
@@ -112,9 +112,9 @@ flowchart LR
 # SPDX-License-Identifier: GPL-2.0-or-later
 """製品固有のブランディング定義。upstream との衝突面を1ファイルに閉じ込める。"""
 
-APP_NAME = "KeRT-mapper"
+APP_NAME = "KeRT-Keymapper"
 APP_ORG = "digitarhythm"
-APP_URL = "https://github.com/digitarhythm/KeRT-mapper"
+APP_URL = "https://github.com/digitarhythm/KeRT-Keymapper"
 APP_DESCRIPTION = "Vial-compatible keyboard configurator with HostOS support"
 
 # フォーク元。GPL-2.0 の表示義務およびユーザーへの案内に使用する
@@ -132,7 +132,7 @@ UPSTREAM_URL = "https://get.vial.today/"
 | ファイル | 対応 |
 |---|---|
 | `src/main/python/branding.py` | 新規作成 |
-| `util/macos/Vial.spec` | → `util/macos/KeRT-mapper.spec` にリネーム（独自追加ファイル） |
+| `util/macos/Vial.spec` | → `util/macos/KeRT-Keymapper.spec` にリネーム（独自追加ファイル） |
 | `util/macos/build.sh` | 3, 34, 35, 42, 47, 50, 53, 55, 59 行目の `Vial` を置換（独自追加） |
 | `util/macos/rthook_fbs_build_settings.py` | 10行目 `app_name`、13行目 `mac_bundle_identifier`（独自追加） |
 | `util/macos/README.md` | 全面更新（独自追加） |
@@ -145,7 +145,7 @@ UPSTREAM_URL = "https://get.vial.today/"
 | `src/build/settings/base.json` | `app_name`, `author`, `version` |
 | `src/build/settings/mac.json` | `mac_bundle_identifier` |
 | `src/build/settings/linux.json` | `description`, `author_email`, `url`（現在すべて空） |
-| `misc/Vial.yml` | → `misc/KeRT-mapper.yml` にリネーム、内容の `Vial` を置換 |
+| `misc/Vial.yml` | → `misc/KeRT-Keymapper.yml` にリネーム、内容の `Vial` を置換 |
 
 ### 衝突リスク中（定数化で最小限に抑える）
 
@@ -210,7 +210,7 @@ upstream は Catppuccin 系4種など**テーマを追加し続けている**。
 ```python
 # src/main/python/branding_theme.py
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""KeRT-mapper 独自テーマ。upstream の themes.py を変更せずに登録する。"""
+"""KeRT-Keymapper 独自テーマ。upstream の themes.py を変更せずに登録する。"""
 
 from PyQt5.QtGui import QPalette, QColor
 
@@ -404,7 +404,7 @@ CI がタグで GitHub Release を作成する設定のため、リリース作�
 ### `.vil` 表示名の扱い
 
 `"Vial layout (*.vil)"` のファイルダイアログ表示名を変更するか。拡張子自体は
-互換性のため据え置くので、表示だけ `"KeRT-mapper layout (*.vil)"` とするか、
+互換性のため据え置くので、表示だけ `"KeRT-Keymapper layout (*.vil)"` とするか、
 `.vil` が Vial 由来の形式である事実を尊重してそのまま残すかの判断。
 
 ### ブランドカラー

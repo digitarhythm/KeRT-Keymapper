@@ -103,13 +103,7 @@ class HostOS(BasicEditor):
         self.cards_available = []
         self.cards = []
         self.container = EntryCardContainer()
-        for x in range(MAX_HOST_OS_ENTRIES):
-            entry = HostOSEntryUI(x)
-            entry.key_changed.connect(partial(self.on_key_changed, x))
-            self.host_os_entries_available.append(entry)
-            card = EntryCard(entry.widget())
-            card.set_title("HOS({})".format(x))
-            self.cards_available.append(card)
+        # entries are created on demand (ensure_entries), as many as the keyboard has
 
         self.hint = QLabel()
         self.hint.setWordWrap(True)
@@ -121,8 +115,20 @@ class HostOS(BasicEditor):
     def host_os_base(self):
         return self.keyboard.host_os_base
 
+    def ensure_entries(self, count):
+        """Create entry widgets (and their cards) until `count` exist; at most MAX_HOST_OS_ENTRIES."""
+        while len(self.host_os_entries_available) < min(count, MAX_HOST_OS_ENTRIES):
+            x = len(self.host_os_entries_available)
+            entry = HostOSEntryUI(x)
+            entry.key_changed.connect(partial(self.on_key_changed, x))
+            self.host_os_entries_available.append(entry)
+            card = EntryCard(entry.widget())
+            card.set_title("HOS({})".format(x))
+            self.cards_available.append(card)
+
     def rebuild_ui(self):
         shown = min(self.keyboard.host_os_count, MAX_HOST_OS_ENTRIES)
+        self.ensure_entries(shown)
         self.host_os_entries = self.host_os_entries_available[:shown]
         self.cards = self.cards_available[:shown]
         for x, e in enumerate(self.host_os_entries):

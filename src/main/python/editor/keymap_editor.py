@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import json
 
-from PyQt5.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QMessageBox, QSplitter, QWidget
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QMessageBox, QSizePolicy, QSpacerItem, QSplitter, QWidget
+from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal
 
 from any_keycode_dialog import AnyKeycodeDialog
 from editor.basic_editor import BasicEditor
@@ -13,6 +13,7 @@ from tabbed_keycodes import TabbedKeycodes, keycode_filter_masked
 from util import tr, KeycodeDisplay
 from vial_device import VialKeyboard
 from branding_theme import LAYOUT_SPACING
+from constants import KEY_SIZE_RATIO
 
 # keyboard (top) : keycode picker (bottom)
 SPLIT_RATIO = (4, 6)
@@ -91,9 +92,16 @@ class KeymapEditor(BasicEditor):
         self.container.clicked.connect(self.on_key_clicked)
         self.container.deselected.connect(self.on_key_deselected)
 
+        # layer buttons directly left of the keyboard, one key width apart; the pair is centred, the zoom
+        # buttons stay at the right edge. The gap follows the keyboard's scale (see fit_keyboard).
         row = QHBoxLayout()
+        # the left spacer stretches (group centred) unless the layer buttons are pulled left to line up
+        # with the editor tab bar, see place_layer_column()
+        self.left_gap = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        row.addItem(self.left_gap)
         row.addLayout(layer_column)
-        row.addStretch()
+        self.key_gap = QSpacerItem(0, 0, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        row.addItem(self.key_gap)
         row.addWidget(self.container)
         row.setAlignment(self.container, Qt.AlignHCenter | Qt.AlignTop)
         row.addStretch()
@@ -111,6 +119,10 @@ class KeymapEditor(BasicEditor):
         # the keyboard is scaled to the space the top pane gives it (until +/- is used)
         self.auto_fit = True
         self.container.fit_mode = True
+        # callable giving the global x the layer buttons' left edge is aligned to when the centred group
+        # would put them right of it (the main window points it at the editor tab bar); None = no guide
+        self.left_guide = None
+        self.placement = None
         w.resized.connect(self.fit_keyboard)
         w.resized.connect(self.update_picker_wrap)
 
@@ -184,14 +196,61 @@ class KeymapEditor(BasicEditor):
         width, height = win.width(), win.height()
         self.tabbed_keycodes.set_wrap_width(None if height > width else height)
 
+    def key_width_px(self, scale=None):
+        """Width of one key on the keymap at the given (default: current) scale"""
+        if scale is None:
+            scale = self.container.get_scale()
+        return self.container.fontMetrics().height() * KEY_SIZE_RATIO * scale
+
+    def place_layer_column(self):
+        """Layer buttons one key left of the first key (the keyboard widget's own padding and the row spacing
+        are part of that distance), the group centred. When that would put the buttons' left edge right of
+        the guide (the editor tab bar's left edge), the buttons move left onto the guide instead and the
+        keyboard stays where it is, so the gap grows"""
+        spacing = self.row.spacing()
+        gap = max(0, int(round(self.key_width_px())) - self.container.padding - spacing)
+        left, left_policy = 0, QSizePolicy.Expanding
+        guide = self.left_guide() if self.left_guide else None
+        if guide is not None:
+            area = self.keyboard_area
+            inner = area.rect().marginsRemoved(area.layout().contentsMargins())
+            # (QBoxLayout adds its spacing after the two non-spacer items only: the column and the keyboard)
+            leftover = inner.width() - self.layer_column.sizeHint().width() - gap \
+                - self.container.sizeHint().width() - self.size_column.sizeHint().width() - 2 * spacing
+            if leftover > 0:
+                centred = (leftover + 1) // 2      # what the left stretch would get
+                column_left = area.mapToGlobal(QPoint(inner.left() + centred, 0)).x()
+                shift = min(column_left - guide, centred)
+                if shift > 0:
+                    left, left_policy = centred - shift, QSizePolicy.Fixed
+                    gap += shift
+        placement = (left, left_policy, gap)
+        if placement != self.placement:
+            self.placement = placement
+            self.left_gap.changeSize(left, 0, left_policy, QSizePolicy.Minimum)
+            self.key_gap.changeSize(gap, 0, QSizePolicy.Fixed, QSizePolicy.Minimum)
+            # a spacer's new size is only picked up once the top-level layout is invalidated
+            self.row.invalidate()
+            self.keyboard_area.layout().invalidate()
+
+    def place_layer_column_later(self):
+        """Re-place once pending layout work (new buttons, moved tab bar) has settled"""
+        QTimer.singleShot(0, self.place_layer_column)
+
     def fit_keyboard(self):
         """Auto-fit: the largest scale that shows the whole keyboard in the top pane"""
         if not self.auto_fit or not self.container.widgets:
             return
-        scale = self.container.fit_scale(*self.keyboard_space(), max_scale=MAX_FIT_SCALE)
+        width, height = self.keyboard_space()
+        scale = self.container.fit_scale(width, height, max_scale=MAX_FIT_SCALE)
+        if scale is not None:
+            # second pass: the one-key gap next to the keyboard takes room as well
+            scale = self.container.fit_scale(width - self.key_width_px(scale), height, max_scale=MAX_FIT_SCALE)
         if scale is not None and abs(scale - self.container.get_scale()) > 0.001:
             self.container.set_scale(scale)
             self.container.update_layout()
+        self.place_layer_column()
+        self.place_layer_column_later()
 
     def adjust_size(self, minus):
         # manual zoom: stop auto-fitting until the next keyboard is loaded
@@ -202,6 +261,8 @@ class KeymapEditor(BasicEditor):
         else:
             self.container.set_scale(self.container.get_scale() + 0.1)
         self.refresh_layer_display()
+        self.place_layer_column()
+        self.place_layer_column_later()
 
     def rebuild(self, device):
         super().rebuild(device)

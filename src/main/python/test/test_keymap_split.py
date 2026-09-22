@@ -140,3 +140,86 @@ def test_picker_wrap_follows_resize(qtbot):
     mw.resize(1600, 900)
     qtbot.waitUntil(lambda: mw.width() > mw.height())
     qtbot.waitUntil(lambda: ke.tabbed_keycodes.wrap_width == mw.height())
+
+
+def test_layer_buttons_one_key_left_of_keyboard(qtbot):
+    """The layer buttons sit directly left of the keyboard, one key width away, centred with it"""
+    mw, ke = prepared(qtbot)
+    kb = ke.container
+
+    def buttons():
+        # the +/- zoom buttons follow the layer buttons in the list; the list is rebuilt on reconnect
+        return ke.layer_buttons[:ke.keyboard.layers]
+
+    # the row re-lays out on the event loop pass after the buttons appear and the keyboard is fitted
+    def settled():
+        b = buttons()
+        return (kb.width > 0 and b and all(x.isVisible() for x in b)
+                and ke.layer_column.geometry().width() >= b[0].sizeHint().width()
+                and kb.geometry().width() == kb.sizeHint().width()
+                and ke.key_gap.geometry().width() == ke.key_gap.sizeHint().width())
+    qtbot.waitUntil(settled)
+    right = max(b.mapToGlobal(b.rect().topRight()).x() for b in buttons())
+    first_key = kb.mapToGlobal(kb.rect().topLeft()).x() + kb.padding
+    gap = first_key - right - 1
+    expected = ke.key_width_px()
+    assert abs(gap - expected) <= 3, (gap, expected)
+    # not stuck at the left edge: the group is centred
+    left = min(b.mapToGlobal(b.rect().topLeft()).x() for b in buttons())
+    area_left = ke.keyboard_area.mapToGlobal(ke.keyboard_area.rect().topLeft()).x()
+    assert left - area_left > 100
+
+
+def settled_layer_column(qtbot, ke):
+    """Wait until the row has laid out the (rebuilt) layer buttons, gap and fitted keyboard"""
+    kb = ke.container
+
+    def buttons():
+        return ke.layer_buttons[:ke.keyboard.layers]
+
+    def ok():
+        b = buttons()
+        return (kb.width > 0 and b and all(x.isVisible() for x in b)
+                and ke.layer_column.geometry().width() >= b[0].sizeHint().width()
+                and kb.geometry().width() == kb.sizeHint().width()
+                and ke.key_gap.geometry().width() == ke.key_gap.sizeHint().width()
+                and ke.left_gap.geometry().width() == ke.row.itemAt(0).geometry().width())
+    qtbot.waitUntil(ok)
+    return buttons
+
+
+def test_layer_buttons_align_with_tab_bar(qtbot):
+    """When the centred group would put the layer buttons right of the guide (the editor tab bar's left
+    edge), the buttons move left onto the guide and the keyboard stays put"""
+    mw, ke = prepared(qtbot)
+    kb = ke.container
+    buttons = settled_layer_column(qtbot, ke)
+    left = lambda: min(b.mapToGlobal(b.rect().topLeft()).x() for b in buttons())
+    kb_left = lambda: kb.mapToGlobal(kb.rect().topLeft()).x()
+    centred_left, kb_at = left(), kb_left()
+
+    # a guide left of the centred position pulls the buttons onto it
+    guide = centred_left - 120
+    ke.left_guide = lambda: guide
+    ke.place_layer_column()
+    qtbot.waitUntil(lambda: abs(left() - guide) <= 1)
+    assert kb_left() == kb_at
+    assert ke.key_gap.sizeHint().width() > ke.key_width_px()
+
+    # a guide right of the centred position changes nothing: the group stays centred
+    ke.left_guide = lambda: centred_left + 200
+    ke.place_layer_column()
+    qtbot.waitUntil(lambda: left() == centred_left)
+    assert kb_left() == kb_at
+    assert abs(kb_left() + kb.padding - max(b.mapToGlobal(b.rect().topRight()).x() for b in buttons()) - 1
+               - ke.key_width_px()) <= 3
+
+
+def test_layer_button_guide_is_editor_tab_bar(qtbot):
+    """The main window points the guide at the left edge of the (centred) editor tab bar"""
+    mw, ke = prepared(qtbot)
+    bar = mw.tabs.tabBar()
+    qtbot.waitUntil(lambda: bar.count() > 0 and bar.isVisible())
+    assert ke.left_guide() == bar.mapToGlobal(bar.tabRect(0).topLeft()).x()
+    # the tab bar is centred, so its left edge is well inside the window
+    assert ke.left_guide() - mw.mapToGlobal(mw.rect().topLeft()).x() > 100

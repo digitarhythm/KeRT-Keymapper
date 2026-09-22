@@ -195,7 +195,7 @@ def test_selected_key_filled(qtbot):
 
 
 def test_device_combobox_size(qtbot):
-    """ The keyboard selector at the top is twice as tall as a default combobox and uses a 4pt larger font """
+    """ The keyboard selector at the top is 1.4x as tall as a default combobox and uses a 4pt larger font """
     from PyQt5.QtWidgets import QComboBox
     from test_gui import prepare, FAKE_KEYBOARD
 
@@ -207,7 +207,9 @@ def test_device_combobox_size(qtbot):
 
     reference = QComboBox()
     qtbot.addWidget(reference)
-    assert cb.height() >= 2 * reference.sizeHint().height()
+    from main_window import HEADER_HEIGHT_FACTOR
+    assert HEADER_HEIGHT_FACTOR == 1.4
+    assert cb.height() >= round(HEADER_HEIGHT_FACTOR * reference.sizeHint().height())
 
 
 def test_select_keyboard_icon(qtbot):
@@ -228,7 +230,7 @@ def test_select_keyboard_icon(qtbot):
 
 
 def test_no_text_logo(qtbot):
-    """ The image logo replaced the "KeRT-mapper" text wordmark """
+    """ The image logo replaced the "KeRT-Keymapper" text wordmark """
     from test_gui import prepare, FAKE_KEYBOARD
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
@@ -345,7 +347,7 @@ def test_picker_key_size(qtbot):
 
 
 def test_logo_image(qtbot):
-    """ The KeRT-mapper logo image sits at the left of the header, scaled to the selector's height """
+    """ The KeRT-Keymapper logo image sits at the left of the header, scaled to the selector's height """
     from test_gui import prepare, FAKE_KEYBOARD
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
@@ -448,3 +450,26 @@ def test_checkbox_check_mark(qtbot):
     assert n_checked > 0
     # unchecked: white background everywhere, checked: mostly brand colour with a white mark
     assert n_checked < n_unchecked
+
+
+def test_editor_tabs_centred(qtbot):
+    """ The editor tab bar (Keymap, Macros, ...) is centred above the editors """
+    from test_gui import prepare, FAKE_KEYBOARD
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD)
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    mw.resize(1600, 1000)
+    bar = mw.tabs.tabBar()
+    qtbot.waitUntil(lambda: bar.width() > 0 and mw.tabs.width() >= 1500)
+    assert mw.tabs.objectName() == "editor_tabs"
+    assert "alignment: center" in QApplication.instance().styleSheet()
+    bar_centre = bar.mapTo(mw.tabs, bar.rect().center()).x()
+    assert abs(bar_centre - mw.tabs.width() / 2) < mw.tabs.width() * 0.05
+
+    # the keycode picker's tab bar (Basic, ISO/JIS, ...) is centred too
+    ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
+    assert ak.objectName() == "picker_tabs"
+    pbar = ak.tabBar()
+    qtbot.waitUntil(lambda: pbar.width() > 0 and ak.width() > 1000)
+    pbar_centre = pbar.mapTo(ak, pbar.rect().center()).x()
+    assert abs(pbar_centre - ak.width() / 2) < ak.width() * 0.05

@@ -37,11 +37,15 @@ from editor.matrix_test import MatrixTest
 import themes
 import branding_theme
 import branding
+import startup_progress
 from widgets.device_combobox import DeviceComboBox
 
 
 # inner margin of the header row (keyboard selector), in pixels
 HEADER_MARGIN = 6
+# height of the keyboard selector (and the icon / logo scaled to it) relative to a default combobox;
+# was 2.0, reduced to 70% of that on 2026-09-22 to make the header slimmer
+HEADER_HEIGHT_FACTOR = 1.4
 
 
 class MainWindow(QMainWindow):
@@ -76,7 +80,9 @@ class MainWindow(QMainWindow):
         font = self.combobox_devices.font()
         font.setPointSize(font.pointSize() + 4)
         self.combobox_devices.setFont(font)
-        self.combobox_devices.setMinimumHeight(2 * QComboBox().sizeHint().height())
+        # never below what the two text lines (owner above keyboard name) need
+        self.combobox_devices.setMinimumHeight(max(round(HEADER_HEIGHT_FACTOR * QComboBox().sizeHint().height()),
+                                                   self.combobox_devices.sizeHint().height()))
         # as wide as the longest keyboard name, no wider
         self.combobox_devices.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.combobox_devices.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -101,7 +107,7 @@ class MainWindow(QMainWindow):
 
         # logo image at the left of the header, scaled to the selector's height
         self.lbl_logo_image = QLabel()
-        logo_pixmap = QPixmap(appctx.get_resource("kert-mapper.png"))
+        logo_pixmap = QPixmap(appctx.get_resource("kert-keymapper.png"))
         if not logo_pixmap.isNull():
             self.lbl_logo_image.setPixmap(logo_pixmap.scaledToHeight(
                 self.combobox_devices.minimumHeight(), Qt.SmoothTransformation))
@@ -143,7 +149,10 @@ class MainWindow(QMainWindow):
 
         self.current_tab = None
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("editor_tabs")   # the stylesheet centres this tab bar
         self.tabs.currentChanged.connect(self.on_tab_changed)
+        # the layer buttons never sit right of the editor tab bar's left edge (keymap_editor.place_layer_column)
+        self.keymap_editor.left_guide = self.tab_bar_left
         self.refresh_tabs()
 
         no_devices = 'No devices detected. Connect a Vial-compatible device and press "Refresh"<br>' \
@@ -192,7 +201,10 @@ class MainWindow(QMainWindow):
         # make sure initial state is valid
         self.on_click_refresh()
 
-        if sys.platform == "emscripten":
+        # browser build: tell the page the app is up, unless the window was built ahead of time
+        # (webmain.preload) - then webmain.main announces it once the keyboard is connected
+        self.appctx_preloaded = bool(getattr(appctx, "preloaded", False))
+        if sys.platform == "emscripten" and not self.appctx_preloaded:
             import vialglue
             QTimer.singleShot(100, vialglue.notify_ready)
 
@@ -371,6 +383,7 @@ class MainWindow(QMainWindow):
         self.refresh_tabs()
 
     def rebuild(self):
+        startup_progress.report("ui")
         # don't show "Security" menu for bootloader mode, as the bootloader is inherently insecure
         self.security_menu.menuAction().setVisible(isinstance(self.autorefresh.current_device, VialKeyboard))
 
@@ -390,6 +403,12 @@ class MainWindow(QMainWindow):
             e.rebuild(self.autorefresh.current_device)
 
     def refresh_tabs(self):
+        # rebuilding every tab is expensive (very much so in the browser build): only do it when the
+        # set of valid editors changed
+        wanted = [lbl for container, lbl in self.editors if container.valid()]
+        if wanted == getattr(self, "_tab_labels", None) and self.tabs.count() == len(wanted):
+            return
+        self._tab_labels = wanted
         self.tabs.clear()
         for container, lbl in self.editors:
             if not container.valid():
@@ -397,6 +416,15 @@ class MainWindow(QMainWindow):
 
             c = EditorContainer(container)
             self.tabs.addTab(c, tr("MainWindow", lbl))
+        # the (centred) tab bar moved: re-place the layer buttons against it
+        self.keymap_editor.place_layer_column_later()
+
+    def tab_bar_left(self):
+        """Global x of the tab bar's left edge (None while there are no tabs)"""
+        bar = self.tabs.tabBar()
+        if bar.count() == 0:
+            return None
+        return bar.mapToGlobal(bar.tabRect(0).topLeft()).x()
 
     def load_via_stack_json(self):
         from urllib.request import urlopen

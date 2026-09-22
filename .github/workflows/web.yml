@@ -1,7 +1,7 @@
 name: Web
 
 # Browser version (web/): built with emscripten and published to GitHub Pages at
-# https://digitarhythm.github.io/KeRT-mapper/ on every version tag, or on demand.
+# https://digitarhythm.github.io/KeRT-Keymapper/ on every version tag, or on demand.
 on:
   push:
     tags: ['v*']
@@ -41,7 +41,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: kert-mapper-web
+        name: kert-keymapper-web
         path: web/src/build
 
     - uses: actions/upload-pages-artifact@v3

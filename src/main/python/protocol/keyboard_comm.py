@@ -21,6 +21,7 @@ from protocol.dynamic import ProtocolDynamic
 from protocol.key_override import ProtocolKeyOverride
 from protocol.macro import ProtocolMacro
 import entry_labels
+import startup_progress
 from protocol.tap_dance import ProtocolTapDance
 from unlocker import Unlocker
 from util import MSG_LEN, hid_send
@@ -83,14 +84,17 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.encoder_layout = dict()
 
         self.reload_layout(sideload_json)
+        startup_progress.report("definition")
         self.reload_layers()
 
         self.reload_macros_early()
         self.reload_persistent_rgb()
         self.reload_rgb()
         self.reload_settings()
+        startup_progress.report("settings")
 
         self.reload_dynamic()
+        startup_progress.report("entries")
         # HostOS borrows the tail of the tap dance slots; never more than there are
         self.host_os_count = min(self.host_os_requested, self.tap_dance_count)
         self.host_os_base = self.tap_dance_count - self.host_os_count
@@ -100,12 +104,16 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
 
         # at this stage we have correct keycode info and can reload everything that depends on keycodes
         self.reload_keymap()
+        startup_progress.report("keymap")
         self.reload_macros_late()
+        startup_progress.report("macros")
         self.reload_tap_dance()
+        startup_progress.report("tapdance")
         entry_labels.update(self)
         self.reload_combo()
         self.reload_key_override()
         self.reload_alt_repeat_key()
+        startup_progress.report("combos")
 
     def reload_layers(self):
         """ Get how many layers the keyboard has """

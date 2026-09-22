@@ -273,6 +273,7 @@ class FilteredTabbedKeycodes(QTabWidget):
         super().__init__(parent)
 
         self.keycode_filter = keycode_filter
+        self.setObjectName("picker_tabs")   # the stylesheet centres this tab bar
 
         self.tabs = [
             Tab(self, "Basic", [

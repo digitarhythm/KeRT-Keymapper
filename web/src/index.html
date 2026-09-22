@@ -1,5 +1,6 @@
 <head>
-    <title>KeRT-mapper Web</title>
+    <meta charset="utf-8">
+    <title>KeRT-Keymapper Web</title>
     <!-- GitHub Pages cannot send COOP/COEP headers; this service worker adds them so SharedArrayBuffer
          (needed by the pthread build) is available. See coi-serviceworker.LICENSE (MIT). -->
     <!-- (kert-serviceworker.js also caches the hashed wasm/data files so that repeat visits start fast) -->
@@ -29,23 +30,161 @@ body {
     align-items: center;
     text-align: center;
 }
+/* while the app starts, a dark backdrop covers the (already painting) app and swallows every event */
+#startup.busy {
+    background-color: rgba(0, 0, 0, 0.55);
+}
+#startup_inner {
+    background-color: #f5f6f8;
+    border: 3px solid #303030;
+    border-radius: 10px;
+    padding: 1.5em 2.5em;
+}
+#intro {
+    max-width: 40em;
+    margin: 0 auto 1.5em auto;
+    font-size: 120%;
+    line-height: 1.6;
+    color: #1f2328;
+}
 /* the start button looks like the cards inside the app: 10px corners, 3px #303030 frame, KeRT green */
-#startup_btn {
-    font-size: 250%;
-    padding: 0.5em 1em;
+.startup_btn {
+    font-size: 140%;
+    padding: 0.4em 1.2em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6em;
+    font-family: inherit;
     color: #ffffff;
     background-color: #00a3a3;
     border: 3px solid #303030;
     border-radius: 10px;
     cursor: pointer;
 }
-#startup_btn:hover:enabled {
+.startup_btn:hover:enabled {
     background-color: #00b8b8;
 }
-#startup_btn:disabled {
+.startup_btn:disabled {
     color: #ffffff;
     opacity: 0.75;
     cursor: default;
+}
+/* an already-permitted keyboard: title, framed name, then the Edit button (#startup_btn) */
+#known {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8em;
+    margin: 0 auto 0.4em auto;
+}
+#known.shown {
+    display: inline-flex;
+}
+/* the button under the name boxes takes their width, with some air above it */
+#known .startup_btn {
+    margin-top: 0.8em;
+    /* 4pt smaller text than the boxes; the vertical padding grows so the button keeps its height */
+    font-size: calc(140% - 4pt);
+    padding: calc(0.15 * 22.4px + 2pt) 1.2em;
+    line-height: 1;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+#known_title {
+    font-size: 16pt;
+    margin: 0 0 0.2em 0;
+    color: #1f2328;
+}
+#known_list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+}
+.known_name {
+    display: block;
+    min-width: 12em;
+    padding: 0.4em 1.4em;
+    line-height: normal;
+    border: 3px solid #303030;
+    border-radius: 10px;
+    background-color: #ffffff;
+    font-size: 140%;   /* the same size as the buttons (.startup_btn) */
+    font-weight: bold;
+    font-family: inherit;
+    text-align: center;
+    color: #1f2328;
+    cursor: pointer;
+}
+.known_name:hover:enabled {
+    background-color: #e6f7f7;
+}
+.known_name:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+/* the keyboard being connected: KeRT green, a spinner laid over the name */
+.known_name.selected, .known_name.selected:disabled {
+    position: relative;
+    background-color: #00a3a3;
+    color: #ffffff;
+    opacity: 1;
+}
+.known_name.selected .spinner {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0.8em;
+    height: 0.8em;
+    margin: -0.4em 0 0 -0.4em;
+    border: 3px solid rgba(48, 48, 48, 0.3);
+    border-top-color: #303030;
+    border-radius: 50%;
+    animation: kert-spin 0.8s linear infinite;
+}
+/* start-up progress under the chosen keyboard (where the "another keyboard" button was) */
+#progress {
+    display: none;
+    flex-direction: column;
+    gap: 0.4em;
+    margin-top: 0.8em;
+}
+#progress.shown {
+    display: flex;
+}
+#progress_bar {
+    height: 1.2em;
+    border: 3px solid #303030;
+    border-radius: 10px;
+    background-color: #ffffff;
+    overflow: hidden;
+}
+#progress_fill {
+    height: 100%;
+    width: 0;
+    background-color: #00a3a3;
+    transition: width 0.3s ease-out;
+}
+#progress_label {
+    font-size: 100%;
+    color: #1f2328;
+    text-align: center;
+}
+/* loading spinner shown inside the button while the app starts */
+#startup_spinner {
+    display: none;
+    width: 1em;
+    height: 1em;
+    border: 3px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: kert-spin 0.8s linear infinite;
+}
+#startup_btn.busy #startup_spinner {
+    display: inline-block;
+}
+@keyframes kert-spin {
+    to { transform: rotate(360deg); }
 }
 #version {
     position: absolute;
@@ -88,15 +227,20 @@ body {
 
 <div id="startup">
     <div id="startup_inner">
-        <input id="startup_btn" type="button" onclick="connect()" value="Exec KeRT-mapper" disabled="true" /><br>
+        <p id="intro"></p>
+        <div id="known">
+            <p id="known_title"></p>
+            <div id="known_list"></div>
+            <button id="other_btn" type="button" class="startup_btn" onclick="choose_and_connect()"></button>
+            <div id="progress"><div id="progress_bar"><div id="progress_fill"></div></div><div id="progress_label"></div></div>
+        </div>
+        <button id="startup_btn" type="button" class="startup_btn" onclick="connect()" disabled="true"><span id="startup_spinner"></span><span id="startup_label"></span></button><br>
         <div id="error" style="display:none">
             <p id="error_msg"></p>
-            <p>You can check web browser support at <a href="https://caniuse.com/webhid" target="_blank">caniuse.com</a>.<br>
-                Latest versions of Chrome, Chromium or Edge are recommended to use KeRT-mapper Web.<br>
-                You can also download the standalone KeRT-mapper application from <a href="https://github.com/digitarhythm/KeRT-mapper/releases/latest" target="_blank">GitHub</a>.</p>
+            <p id="support_note"></p>
         </div>
     </div>
-    <div id="version">KeRT-mapper: @VIAL_VER@<br>Web: @WEB_VER@<br>Support: @VIA_STACK_VER@</div>
+    <div id="version">KeRT-Keymapper: @VIAL_VER@<br>Web: @WEB_VER@<br>Support: @VIA_STACK_VER@</div>
 </div>
 
 <div id="unlock" style="display:none">
@@ -112,8 +256,131 @@ body {
 <canvas id="canvas" oncontextmenu="return false;" tabindex="-1"></canvas>
 
 <script>
+    // page texts, Japanese when the browser language is Japanese (the app itself follows the same rule)
+    var STRINGS = {
+        ja: {
+            intro: "KeRT-Keymapperを起動する前に、接続されているキーボードをブラウザで認識する必要があります。" +
+                   "下記のボタンをクリックすると接続されているキーボード一覧が表示されるので、" +
+                   "そこからキーマップを編集するキーボードを選択してください。",
+            start: "キーボードの認識を開始する",
+            known_title: "編集するキーボードを選択",
+            progress: {connect: "接続", definition: "キーボード定義", settings: "設定", entries: "拡張機能の件数", keymap: "キーマップ",
+                       macros: "マクロ", tapdance: "Tap Dance / HostOS", combos: "Combo / Key Override / Alt Repeat", ui: "画面の組み立て",
+                       layout: "画面の配置", finishing: "仕上げ", ready: "完了"},
+            other: "別のキーボードを選択",
+            support_note: "WebHID への対応状況は {caniuse} で確認できます。KeRT-Keymapper Web には最新の Chrome / Chromium / Edge をお使いください。デスクトップ版の KeRT-Keymapper は {github} からダウンロードできます。",
+            preparing: "起動準備中…",
+            requesting: "キーボードを選択してください…",
+            connecting: "接続中…",
+            starting: "起動中",
+            open_failed: "キーボードを開けませんでした: {error}。他のプログラム（デスクトップ版など）がキーボードを使っていないか確認してください。"
+        },
+        en: {
+            intro: "Before KeRT-Keymapper can start, the browser has to be given access to the connected keyboard. " +
+                   "Click the button below: the browser lists the connected keyboards, pick the one whose keymap you want to edit.",
+            start: "Recognize a keyboard",
+            known_title: "Select the keyboard to edit",
+            progress: {connect: "Connecting", definition: "Keyboard definition", settings: "Settings", entries: "Feature entries", keymap: "Keymap",
+                       macros: "Macros", tapdance: "Tap Dance / HostOS", combos: "Combo / Key Override / Alt Repeat", ui: "Building the window",
+                       layout: "Laying out", finishing: "Finishing", ready: "Ready"},
+            other: "Choose another keyboard",
+            support_note: "You can check web browser support at {caniuse}. Latest versions of Chrome, Chromium or Edge are recommended to use KeRT-Keymapper Web. You can also download the standalone KeRT-Keymapper application from {github}.",
+            preparing: "Preparing\u2026",
+            requesting: "Pick a keyboard\u2026",
+            connecting: "Connecting\u2026",
+            starting: "Starting up",
+            open_failed: "Could not open the keyboard: {error}. Check that no other program (e.g. the desktop app) is using it."
+        }
+    };
+    var T = STRINGS[(navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en"];
+    document.getElementById("intro").innerText = T.intro;
+
+    // the start button: label text, enabled or not, with a spinner while busy
+    function set_startup_button(text, enabled, busy) {
+        var btn = document.getElementById("startup_btn");
+        document.getElementById("startup_label").innerText = text;
+        btn.disabled = !enabled;
+        btn.classList.toggle("busy", !!busy);
+        if (typeof set_backdrop === "function") set_backdrop(!!busy);
+    }
+    set_startup_button(T.preparing, false, false);
+    document.getElementById("other_btn").innerText = T.other;
+    document.getElementById("support_note").innerHTML = T.support_note
+        .replace("{caniuse}", '<a href="https://caniuse.com/webhid" target="_blank">caniuse.com</a>')
+        .replace("{github}", '<a href="https://github.com/digitarhythm/KeRT-Keymapper/releases/latest" target="_blank">GitHub</a>');
+
+    // dark backdrop over the whole page while the app starts; the canvas gets no events until it is lifted
+    function set_backdrop(on) {
+        document.getElementById("startup").classList.toggle("busy", on);
+        var canvas = document.getElementById("canvas");
+        canvas.style.pointerEvents = on ? "none" : "";
+        if (on && document.activeElement === canvas) canvas.blur();
+    }
+
+    // --- start-up progress bar: steps come from Python (startup_progress.py); between two steps the bar
+    // creeps towards the next one so that a long step (building the window) still shows motion
+    var g_progress = {active: false, value: 0, target: 0, next: 0, timer: null};
+
+    function progress_render() {
+        document.getElementById("progress_fill").style.width = (100 * g_progress.value).toFixed(1) + "%";
+    }
+
+    function progress_reset(active) {
+        if (g_progress.timer) { clearInterval(g_progress.timer); g_progress.timer = null; }
+        g_progress = {active: active, value: 0, target: 0, next: 0, timer: null};
+        document.getElementById("progress_label").innerText = "";
+        progress_render();
+        if (active) {
+            g_progress.timer = setInterval(function () {
+                // creep: about 1/8 of a step per second, never past 90% of the way to the next step
+                var limit = g_progress.target + 0.9 * (g_progress.next - g_progress.target);
+                if (g_progress.value < limit) {
+                    g_progress.value = Math.min(limit, g_progress.value + (g_progress.next - g_progress.target) / 8 * 0.1);
+                    progress_render();
+                }
+            }, 100);
+        }
+    }
+
+    function progress_step(step, done, total) {
+        if (!g_progress.active) return;     // reports during the preload (no keyboard chosen yet)
+        if (step == "ready") { done = total - 0.5; step = "finishing"; }   // painted a little later
+        g_progress.target = done / total;
+        g_progress.next = Math.min(1, (done + 1) / total);
+        g_progress.value = Math.max(g_progress.value, g_progress.target);
+        document.getElementById("progress_label").innerText = T.progress[step] || step;
+        progress_render();
+    }
+
+    // known-keyboard panel while connecting / starting: the chosen box turns green with a spinner over
+    // its name, the other boxes are disabled and the "another keyboard" button is hidden
+    function set_known_status(text, busy) {
+        document.querySelectorAll("#known_list .known_name").forEach(function (b) {
+            b.disabled = !!busy;
+            if (!busy) {
+                b.classList.remove("selected");
+                b.querySelectorAll(".spinner").forEach(function (sp) { sp.remove(); });
+            }
+        });
+        // the progress bar takes the button's place while connecting, so nothing else moves
+        document.getElementById("other_btn").style.display = busy ? "none" : "";
+        document.getElementById("other_btn").disabled = !!busy;
+        document.getElementById("progress").classList.toggle("shown", !!busy);
+        progress_reset(!!busy);
+        set_backdrop(!!busy);
+    }
+
+    function select_box(box) {
+        box.classList.add("selected");
+        if (!box.querySelector(".spinner")) {
+            var sp = document.createElement("span");
+            sp.className = "spinner";
+            box.appendChild(sp);
+        }
+    }
+
     var Module = {};
-    // UI language: KeRT-mapper reads KERT_LANG (branding_i18n.py); take it from the browser
+    // UI language: KeRT-Keymapper reads KERT_LANG (branding_i18n.py); take it from the browser
     Module.preRun = [function () { ENV.KERT_LANG = (navigator.language || "en").replace("-", "_"); }];
     Module.canvas = document.getElementById("canvas");
     Module.qtCanvasElements = [Module.canvas];
@@ -167,16 +434,26 @@ body {
         } else if (e.data.cmd == "unlock_done") {
             document.getElementById("unlock").style.display = "none";
         } else if (e.data.cmd == "notify_ready") {
-            clearInterval(g_animation);
+            progress_step("ready", 1, 1);
+            set_backdrop(false);        // start-up finished: lift the backdrop, the app takes events again
             document.getElementById("startup").style.display = "none";
         } else if (e.data.cmd == "notify_alive") {
-            document.getElementById("startup_btn").disabled = false;
+            // build the app's window now, while the user picks a keyboard (docs/web-startup-preload-spec.md)
+            PThread.runningWorkers[0].postMessage({cmd: "py", payload: "import webmain;webmain.preload(qtApp)"});
+            set_startup_button(T.start, true, false);
+            // a keyboard this site may already use: name it on the button (it connects without the chooser)
+            if (navigator.hid) refresh_known();
         } else if (e.data.cmd == "load_layout") {
             loadLayout();
         } else if (e.data.cmd == "save_layout") {
             saveLayout(e.data.layout);
+        } else if (e.data.cmd == "progress") {
+            progress_step(e.data.step, e.data.done, e.data.total);
         } else if (e.data.cmd == "fatal_error") {
-            alert(e.data.msg);
+            // shown on the page (no blocking alert); the start controls come back so the user can retry
+            set_state("", false);
+            document.getElementById("error").style.display = "block";
+            document.getElementById("error_msg").innerText = e.data.msg;
         }
     }
 
@@ -238,26 +515,98 @@ body {
         }
     }
 
-    async function connect() {
-        var btn = document.getElementById("startup_btn");
+    var HID_FILTER = {filters: [{usagePage: 0xFF60, usage: 0x61}]};
 
-        btn.disabled = true;
-        btn.value = "Requesting device list...";
-        devices = await navigator.hid.requestDevice({filters: [{usagePage: 0xFF60, usage: 0x61}]});
-        if (devices.length != 1) {
-            btn.value = "Exec KeRT-mapper";
-            btn.disabled = false;
-            return;
+    function is_vial_interface(device) {
+        return device.collections.some(function (c) { return c.usagePage == 0xFF60 && c.usage == 0x61; });
+    }
+
+    // keyboards this site may already use (permitted earlier, plugged in now); [] = none known yet
+    var g_known = [];
+
+    function device_name(device) {
+        return (device.productName || "").trim() || device.vendorId.toString(16) + ":" + device.productId.toString(16);
+    }
+
+    // one clickable name box per known keyboard, stacked; clicking a box connects to that keyboard
+    function show_known(devices) {
+        g_known = devices;
+        var list = document.getElementById("known_list");
+        list.innerHTML = "";
+        devices.forEach(function (device) {
+            var box = document.createElement("button");
+            box.type = "button";
+            box.className = "known_name";
+            box.innerText = device_name(device);
+            box.onclick = function () { select_box(box); connect_to(device); };
+            list.appendChild(box);
+        });
+        document.getElementById("known_title").innerText = T.known_title;
+        document.getElementById("known").classList.add("shown");
+        // all boxes and the button share one width: three times the text width of the first keyboard name
+        var first = list.firstElementChild;
+        if (first) {
+            var probe = document.createElement("span");
+            probe.style.font = getComputedStyle(first).font;
+            probe.style.position = "absolute";
+            probe.style.visibility = "hidden";
+            probe.style.whiteSpace = "nowrap";
+            probe.innerText = first.innerText;
+            document.body.appendChild(probe);
+            document.getElementById("known").style.width = Math.round(probe.offsetWidth * 3) + "px";
+            probe.remove();
         }
-        btn.value = "Connecting to the device...";
+        document.getElementById("intro").style.display = "none";
+        document.getElementById("startup_btn").style.display = "none";
+        set_known_status("", false);
+    }
+
+    async function refresh_known() {
+        try {
+            var known = (await navigator.hid.getDevices()).filter(is_vial_interface);
+            if (known.length > 0) show_known(known);
+        } catch (err) { /* no WebHID */ }
+    }
+
+    // "recognize a keyboard" (no known keyboard yet): the browser's chooser, then connect straight away
+    async function connect() {
+        var device = await choose_keyboard();
+        if (device) await connect_to(device);
+    }
+
+    // "another keyboard": the browser's chooser; the chosen keyboard joins the list (it is permitted now)
+    async function choose_and_connect() {
+        var device = await choose_keyboard();
+        if (device) await refresh_known();
+    }
+
+    function set_state(text, busy) {
+        if (g_known.length > 0) set_known_status(text, busy);
+        else set_startup_button(text || T.start, !busy && !text, busy);
+    }
+
+    async function choose_keyboard() {
+        set_state(T.requesting, false);
+        var devices;
+        try {
+            devices = await navigator.hid.requestDevice(HID_FILTER);
+        } catch (err) {
+            devices = [];
+        }
+        set_state("", false);
+        return devices.length == 1 ? devices[0] : null;
+    }
+
+    async function connect_to(device) {
+        var devices = [device];
+        set_state(T.connecting, true);
         try {
             await devices[0].open();
         } catch (err) {
             // typically: another program (e.g. the desktop app) has the keyboard open
-            document.getElementById("error_msg").innerText =
-                "Could not open the device: " + err.message + ". Close other programs that use the keyboard and try again.";
-            btn.value = "Exec KeRT-mapper";
-            btn.disabled = false;
+            document.getElementById("error").style.display = "block";
+            document.getElementById("error_msg").innerText = T.open_failed.replace("{error}", err.message);
+            set_state("", false);
             return;
         }
         devices[0].oninputreport = function(ev) {
@@ -283,18 +632,12 @@ body {
             usage: 97,
             interface_number: 1
         };
-        _vialglue_set_device_desc(allocateUTF8(JSON.stringify(device_desc)));
+        // emscripten renamed allocateUTF8 to stringToNewUTF8 (3.1.35+)
+        var to_c_string = (typeof stringToNewUTF8 === "function") ? stringToNewUTF8 : allocateUTF8;
+        _vialglue_set_device_desc(to_c_string(JSON.stringify(device_desc)));
 
-        btn.value = "Starting up....";
+        set_state(T.starting, true);
         PThread.runningWorkers[0].postMessage({cmd: "py", payload: "import webmain;webmain.main(qtApp)"});
-
-        g_animation = setInterval(update_animation, 500);
-        g_animation_counter = 0;
-    }
-
-    function update_animation() {
-        g_animation_counter = (g_animation_counter + 1) % 5;
-        document.getElementById("startup_btn").value = "Starting up" + ".".repeat(g_animation_counter + 1);
     }
 
     function show_error(e) {

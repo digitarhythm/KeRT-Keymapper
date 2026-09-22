@@ -1,12 +1,12 @@
-<p align="center"><img src="misc/kert-mapper.png" alt="KeRT-mapper" width="480"></p>
+<p align="center"><img src="misc/kert-keymapper.png" alt="KeRT-Keymapper" width="480"></p>
 
-# KeRT-mapper
+# KeRT-Keymapper
 
-**KeRT-mapper** is a keyboard configurator for [Vial](https://get.vial.today/)-compatible keyboards
+**KeRT-Keymapper** is a keyboard configurator for [Vial](https://get.vial.today/)-compatible keyboards
 (QMK + Vial firmware) with one extra feature: **HostOS** keys, which send a different keycode depending
 on the operating system the keyboard is plugged into. It is a fork of
 [vial-kb/vial-gui](https://github.com/vial-kb/vial-gui) and talks the unchanged Vial protocol, so every
-keyboard that works with Vial works with KeRT-mapper.
+keyboard that works with Vial works with KeRT-Keymapper.
 
 日本語の説明は[下](#日本語)にあります。
 
@@ -27,19 +27,19 @@ keyboard that works with Vial works with KeRT-mapper.
 
 | Platform | Download |
 |---|---|
-| **Browser** (Chrome, Edge, other Chromium browsers with WebHID) | **https://digitarhythm.github.io/KeRT-mapper/** |
-| macOS, Apple Silicon (M1 and later) | [kert-mapper-mac-arm64.dmg](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-mac-arm64.dmg) |
-| Windows, x64 installer | [kert-mapper-win-x64-setup.exe](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-win-x64-setup.exe) |
-| Windows, x64 portable | [kert-mapper-win-x64.zip](https://github.com/digitarhythm/KeRT-mapper/releases/latest/download/kert-mapper-win-x64.zip) |
+| **Browser** (Chrome, Edge, other Chromium browsers with WebHID) | **https://digitarhythm.github.io/KeRT-Keymapper/** |
+| macOS, Apple Silicon (M1 and later) | [kert-keymapper-mac-arm64.dmg](https://github.com/digitarhythm/KeRT-Keymapper/releases/latest/download/kert-keymapper-mac-arm64.dmg) |
+| Windows, x64 installer | [kert-keymapper-win-x64-setup.exe](https://github.com/digitarhythm/KeRT-Keymapper/releases/latest/download/kert-keymapper-win-x64-setup.exe) |
+| Windows, x64 portable | [kert-keymapper-win-x64.zip](https://github.com/digitarhythm/KeRT-Keymapper/releases/latest/download/kert-keymapper-win-x64.zip) |
 
-All releases: https://github.com/digitarhythm/KeRT-mapper/releases. Intel Macs and 32-bit / ARM
+All releases: https://github.com/digitarhythm/KeRT-Keymapper/releases. Intel Macs and 32-bit / ARM
 Windows are not supported. A Linux AppImage is built by CI as a workflow artifact.
 
-The apps are not code-signed. On macOS, right-click `KeRT-mapper.app` and choose **Open** on first
-launch, or run `xattr -d com.apple.quarantine /path/to/KeRT-mapper.app`.
+The apps are not code-signed. On macOS, right-click `KeRT-Keymapper.app` and choose **Open** on first
+launch, or run `xattr -d com.apple.quarantine /path/to/KeRT-Keymapper.app`.
 
 The browser version needs WebHID, so it works in Chromium-based browsers only. Close any desktop
-configurator (KeRT-mapper, Vial) that has the keyboard open before connecting from the browser: only
+configurator (KeRT-Keymapper, Vial) that has the keyboard open before connecting from the browser: only
 one program can open the keyboard at a time. The first visit downloads about 12 MB; later visits are
 served from the browser cache.
 
@@ -71,7 +71,7 @@ layer-taps placed in a field behave exactly as if they were in the keymap direct
 
 The firmware has to be built from the companion vial-qmk fork with `HOST_OS_ENABLE = yes`
 (and optionally `HOST_OS_COUNT`, default 16); see `quantum/host_os/docs/` there. The build adds
-`"hostOS": {"count": N}` to the keyboard definition, which is how KeRT-mapper learns how many slots
+`"hostOS": {"count": N}` to the keyboard definition, which is how KeRT-Keymapper learns how many slots
 are reserved. Keyboards without it simply show no HostOS tab and behave as in Vial.
 
 ### Using it
@@ -129,7 +129,7 @@ version bundles a subset of Noto Sans CJK JP (SIL Open Font License 1.1, see `we
 
 ## 日本語
 
-KeRT-mapper は、Vial 対応キーボード（QMK + Vial ファームウェア）向けの設定ツールです。
+KeRT-Keymapper は、Vial 対応キーボード（QMK + Vial ファームウェア）向けの設定ツールです。
 [vial-kb/vial-gui](https://github.com/vial-kb/vial-gui) をもとに、次の点を加えています。
 
 - **HostOS キー**: 1 つのキーで、接続先が macOS / Windows / Linux のどれかに応じて別のキーコードを送ります
@@ -138,7 +138,7 @@ KeRT-mapper は、Vial 対応キーボード（QMK + Vial ファームウェア�
 - **白基調のフラットな見た目**、キーボード名の 2 段表示、上下 4:6 のキーマップ画面。
 - **日本語 UI**: OS（ブラウザ版はブラウザ）の言語設定に従います。キーコード名とタブ名は英語のままです。
 
-**入手**: ブラウザ版は https://digitarhythm.github.io/KeRT-mapper/ （Chrome / Edge などの Chromium 系）、
+**入手**: ブラウザ版は https://digitarhythm.github.io/KeRT-Keymapper/ （Chrome / Edge などの Chromium 系）、
 デスクトップ版は上の Download 表から（macOS Apple Silicon、Windows x64）。デスクトップ版はコード署名を
 していないため、macOS では初回のみ右クリック → 開く、または `xattr -d com.apple.quarantine` が必要です。
 ブラウザ版で接続する前に、同じキーボードを開いているデスクトップ版の設定ツールは終了してください。

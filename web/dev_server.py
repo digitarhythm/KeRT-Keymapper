@@ -25,7 +25,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "src")
-SITE = "https://digitarhythm.github.io/KeRT-mapper/"
+SITE = "https://digitarhythm.github.io/KeRT-Keymapper/"
 PREVIEW = os.path.join(HERE, ".preview")
 PORT = 8765
 MAIN_JS = re.compile(r'src="(main-([0-9a-f]{64})\.js)"')
@@ -75,7 +75,8 @@ def prepare(refresh):
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
-                      ".wasm": "application/wasm", ".js": "text/javascript", ".data": "application/octet-stream"}
+                      ".wasm": "application/wasm", ".js": "text/javascript; charset=utf-8", ".data": "application/octet-stream",
+                      ".html": "text/html; charset=utf-8"}
 
     def end_headers(self):
         # what the service worker adds on GitHub Pages: cross-origin isolation for SharedArrayBuffer

@@ -109,12 +109,7 @@ class TapDance(BasicEditor):
         self.cards_available = []
         self.cards = []
         self.container = EntryCardContainer()
-        for x in range(128):
-            entry = TapDanceEntryUI(x)
-            entry.key_changed.connect(self.on_key_changed)
-            entry.timing_changed.connect(self.on_timing_changed)
-            self.tap_dance_entries_available.append(entry)
-            self.cards_available.append(EntryCard(entry.widget()))
+        # entries are created on demand (ensure_entries), as many as the keyboard has
 
         self.hint = QLabel(tr("TapDance", "Use <code>TD(n)</code> to set up these actions in the keymap."))
         self.addWidget(self.hint)
@@ -129,9 +124,20 @@ class TapDance(BasicEditor):
         buttons.addWidget(self.btn_revert)
         self.addLayout(buttons)
 
+    def ensure_entries(self, count):
+        """Create entry widgets (and their cards) until `count` exist; at most 128."""
+        while len(self.tap_dance_entries_available) < min(count, 128):
+            x = len(self.tap_dance_entries_available)
+            entry = TapDanceEntryUI(x)
+            entry.key_changed.connect(self.on_key_changed)
+            entry.timing_changed.connect(self.on_timing_changed)
+            self.tap_dance_entries_available.append(entry)
+            self.cards_available.append(EntryCard(entry.widget()))
+
     def rebuild_ui(self):
         # the last host_os_count slots are HostOS keys and are edited in the HostOS tab instead
         count = self.keyboard.tap_dance_count - getattr(self.keyboard, "host_os_count", 0)
+        self.ensure_entries(count)
         self.tap_dance_entries = self.tap_dance_entries_available[:count]
         self.cards = self.cards_available[:count]
         self.container.set_cards(self.cards)

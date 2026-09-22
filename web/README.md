@@ -1,8 +1,8 @@
-# KeRT-mapper Web
+# KeRT-Keymapper Web
 
-The browser version of KeRT-mapper (WebAssembly build of this repository, WebHID), published to GitHub Pages:
+The browser version of KeRT-Keymapper (WebAssembly build of this repository, WebHID), published to GitHub Pages:
 
-**https://digitarhythm.github.io/KeRT-mapper/**
+**https://digitarhythm.github.io/KeRT-Keymapper/**
 
 WebHID is required, so it works in Chromium-based browsers (Chrome, Edge, Brave, ...) only.
 
@@ -10,7 +10,7 @@ This directory is the build machinery of [vial-kb/vial-web](https://github.com/v
 the app repository (until 2026-09-22 it lived in `digitarhythm/KeRT-mapper-web`). Differences from upstream:
 
 - `src/build.sh` takes the Python sources and resources from this repository (`../../..` from the build
-  directory) and copies the KeRT-mapper resources (logo, icon, check mark, `translations/`).
+  directory) and copies the KeRT-Keymapper resources (logo, icon, check mark, `translations/`).
 - `src/index.html` loads `src/kert-serviceworker.js`: cross-origin isolation for the pthread build
   (GitHub Pages cannot send COOP/COEP headers; based on coi-serviceworker, MIT) plus cache-first delivery of
   the content-hashed wasm/data files so that repeat visits start fast. `Module.preRun` sets `KERT_LANG`

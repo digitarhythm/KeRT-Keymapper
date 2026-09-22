@@ -1,6 +1,12 @@
 name: CI
 
-on: [push, pull_request]
+# Binaries are built only on version tags (which also publish a Release), on demand, and for pull
+# requests; a plain push to main does not start a build (the user decides when to build).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+  pull_request:
 
 jobs:
   build-linux:
@@ -14,8 +20,8 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: kert-mapper-linux
-        path: util/linux-builder/output/KeRT-mapper-x86_64.AppImage
+        name: kert-keymapper-linux
+        path: util/linux-builder/output/KeRT-Keymapper-x86_64.AppImage
 
   # Native Apple Silicon build with PyInstaller (see util/macos/README.md). macos-15 runners are arm64.
   build-mac-arm64:
@@ -41,8 +47,8 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: kert-mapper-mac-arm64
-        path: target/macos-arm64/kert-mapper-mac-arm64.dmg
+        name: kert-keymapper-mac-arm64
+        path: target/macos-arm64/kert-keymapper-mac-arm64.dmg
 
   # On any tag push, publish the macOS (arm64) and Windows (x64) builds as a GitHub Release so that
   # https://github.com/<owner>/<repo>/releases/latest/download/<file> always serves the newest one.
@@ -57,27 +63,27 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: kert-mapper-mac-arm64
+        name: kert-keymapper-mac-arm64
         path: release
 
     - uses: actions/download-artifact@v4
       with:
-        pattern: kert-mapper-win*
+        pattern: kert-keymapper-win*
         merge-multiple: true
         path: release
 
     - name: Name the Windows files by architecture
       run: |
-        mv release/KeRT-mapperSetup.exe release/kert-mapper-win-x64-setup.exe
-        mv release/kert-mapper-win.zip release/kert-mapper-win-x64.zip
+        mv release/KeRT-KeymapperSetup.exe release/kert-keymapper-win-x64-setup.exe
+        mv release/kert-keymapper-win.zip release/kert-keymapper-win-x64.zip
         ls -l release
 
     - uses: softprops/action-gh-release@v2
       with:
         files: |
-          release/kert-mapper-mac-arm64.dmg
-          release/kert-mapper-win-x64-setup.exe
-          release/kert-mapper-win-x64.zip
+          release/kert-keymapper-mac-arm64.dmg
+          release/kert-keymapper-win-x64-setup.exe
+          release/kert-keymapper-win-x64.zip
         generate_release_notes: true
 
   # Windows x64 (AMD64) only
@@ -128,12 +134,12 @@ jobs:
       run: |
         . .\venv\Scripts\activate.ps1
         fbs freeze
-        Compress-Archive -Path "target\KeRT-mapper" -DestinationPath kert-mapper-win.zip
+        Compress-Archive -Path "target\KeRT-Keymapper" -DestinationPath kert-keymapper-win.zip
 
     - uses: actions/upload-artifact@v4
       with:
-        name: kert-mapper-win
-        path: kert-mapper-win.zip
+        name: kert-keymapper-win
+        path: kert-keymapper-win.zip
 
     - name: Create installer
       run: |
@@ -143,5 +149,5 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: kert-mapper-win-installer
-        path: target\KeRT-mapperSetup.exe
+        name: kert-keymapper-win-installer
+        path: target\KeRT-KeymapperSetup.exe

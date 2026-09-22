@@ -187,10 +187,12 @@ def test_editor_labels_translated(ja, qtbot):
     assert mw.matrix_tester.reset_btn.text() == "リセット"
     assert mw.macro_recorder.lbl_memory.text().startswith("マクロ使用メモリ:")
 
+    mw.key_override.ensure_entries(1)   # the virtual keyboard has no key overrides; entries are built on demand
     ko = mw.key_override.key_override_entries_available[0]
     assert ko.options.opt_no_reregister_trigger.text() == "他のキーが押されても解除しない"
     assert labels_of(ko.container)[:2] == ["有効", "有効にするレイヤー"]
 
+    mw.alt_repeat_key.ensure_entries(1)
     ark = mw.alt_repeat_key.alt_repeat_key_entries_available[0]
     assert ark.options.opt_bidirectional.text() == "双方向"
 

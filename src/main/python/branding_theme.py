@@ -108,6 +108,9 @@ def stylesheet(name):
             color: {hlt};
             border-color: {hl};
         }}
+        QTabWidget#editor_tabs::tab-bar, QTabWidget#picker_tabs::tab-bar {{
+            alignment: center;
+        }}
         QTabBar::tab {{
             border: {w}px solid {mid};
             border-bottom: none;

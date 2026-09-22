@@ -28,7 +28,10 @@ if sys.platform == "emscripten":
         def enumerate():
             from util import hid_send
 
-            desc = json.loads(vialglue.get_device_desc())
+            raw = vialglue.get_device_desc()
+            if not raw:
+                return []      # no keyboard chosen yet (the window may be built ahead of time)
+            desc = json.loads(raw)
             # hack: we don't know if it's vial or VIA device because webhid doesn't expose serial number
             # so let's probe it with a vial command, and if the response looks good, inject fake vial serial number
             # in the device descriptor

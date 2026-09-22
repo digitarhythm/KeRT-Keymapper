@@ -1,12 +1,12 @@
 /*
- * KeRT-mapper service worker: cross-origin isolation (COOP/COEP) for the pthread build on GitHub
+ * KeRT-Keymapper service worker: cross-origin isolation (COOP/COEP) for the pthread build on GitHub
  * Pages, plus cache-first delivery of the content-hashed build files so that a repeat visit does not
  * download the 12 MB of wasm/data again.
  *
  * The isolation part is coi-serviceworker v0.1.7 by Guido Zuidhof and contributors (MIT, see
  * coi-serviceworker.LICENSE), rewritten unminified; the caching part is ours.
  */
-const CACHE_NAME = "kert-mapper-assets-v1";
+const CACHE_NAME = "kert-keymapper-assets-v2";
 // main-<sha256>.wasm / .data / .js / .worker.js and datafile_main-<sha256>.data: the hash changes
 // whenever the content does, so a cached copy can be served forever
 const HASHED_ASSET = /\/(datafile_)?main-[0-9a-f]{64}\.(wasm|data|js|worker\.js)$/;

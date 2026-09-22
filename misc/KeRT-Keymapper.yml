@@ -1,0 +1,21 @@
+app: KeRT-Keymapper
+
+ingredients:
+  dist: xenial
+  sources:
+    - deb http://archive.ubuntu.com/ubuntu/ xenial main universe
+  package: kert-keymapper
+  debs:
+    - ../target/KeRT-Keymapper.deb
+
+script:
+  - cat > ./AppRun <<\EOF
+  - #!/bin/sh
+  - HERE=$(dirname $(readlink -f "${0}"))
+  - export QT_QPA_PLATFORM=xcb
+  - exec "${HERE}/opt/KeRT-Keymapper/KeRT-Keymapper" "$@"
+  - EOF
+  - chmod a+x ./AppRun
+  - cp usr/share/icons/hicolor/256x256/apps/KeRT-Keymapper.png .
+  - mv usr/share/applications/KeRT-Keymapper.desktop .
+  - sed -i -e 's@^Version=.*@Version=1.0@g' KeRT-Keymapper.desktop

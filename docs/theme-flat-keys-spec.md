@@ -68,10 +68,10 @@ Fusion スタイルでは角丸や線幅を変えられないため、`branding_
 
 ## 4.2 キーボード選択ドロップダウン
 
-画面最上段の `combobox_devices` は、アプリ既定フォント **+4pt**、高さは既定の **2 倍**（`main_window.py` で `setFont` と `setMinimumHeight`）。
+画面最上段の `combobox_devices` は、アプリ既定フォント **+4pt**、高さは既定の **1.4 倍**（`HEADER_HEIGHT_FACTOR`。2026-09-22 に 2 倍から 70% に縮小。`main_window.py` で `setFont` と `setMinimumHeight`）。キーボードアイコンとロゴ画像はこの高さに合わせて縮小するので、同じく 70% になる。
 ヘッダー行の並びは **キーボードアイコン `lbl_select_keyboard`（`keyboard-icon.png`）→ ロゴ画像 `lbl_logo_image` → ドロップダウン → Refresh**。アイコンとロゴはドロップダウンの高さに合わせて縮小する。
 ドロップダウン内側のキーボード名の左余白は 32px（スタイルシートの `QComboBox { padding-left: 32px; }`）。ドロップダウンの幅は**一番長いキーボード名が収まる幅**（`QComboBox.AdjustToContents`、更新のたびに再計算）。そのすぐ右に Refresh ボタンを置く。ボタンはドロップダウンと同じフォント（既定 +4pt）で、高さはドロップダウンと同じ、幅は文字に合わせる（横長で可）。文字ロゴは置かない。アイコンとロゴは左詰め、ドロップダウンと Refresh は右詰め（間に stretch）。ヘッダー行の内側には `HEADER_MARGIN` = 6px の余白を取る（全体の 3px より広い）。
-行の左端にはロゴ画像 `lbl_logo_image`（`src/main/resources/base/kert-mapper.png`、`misc/kert-mapper.png` が原本。`appctx.get_resource()` で解決し、ドロップダウンの高さに合わせて縦横比を保って縮小）を置く。
+行の左端にはロゴ画像 `lbl_logo_image`（`src/main/resources/base/kert-keymapper.png`、`misc/kert-keymapper.png` が原本。`appctx.get_resource()` で解決し、ドロップダウンの高さに合わせて縦横比を保って縮小）を置く。
 
 ## 4.2.1 ドロップダウンの 2 段表示（2026-09-21 追加）
 
@@ -102,7 +102,7 @@ flowchart LR
   `text_layout(rect)` が `(owner_rect, name_rect)` を返し、owner が空なら `owner_rect` は `None` で
   `name_rect` は縦中央。2 行の場合は「owner 行 + name 行」を縦中央にまとめて置き、owner が上、name が下。
 - サイズ: `sizeHint()` の幅は `padding-left + max(全項目の owner 幅, name 幅) + 矢印 + 枠` で、1 行の全文
-  （`title()`）の幅には依存しない。高さは従来の 2 倍（`setMinimumHeight`）のままで、2 行が収まる。
+  （`title()`）の幅には依存しない。高さは既定の 1.4 倍（`setMinimumHeight`）で、2 行が収まる。
 - プルダウンの各行は `DeviceItemDelegate` が同じ 2 段レイアウトで描き、`sizeHint()` の高さは 2 行分。
 
 ## 4.4 キーマップ画面の上下比率と自動フィット（2026-09-21 追加、2026-09-22 に 4:6 へ）
@@ -158,6 +158,32 @@ flowchart LR
   「`wrap_width` に収まる最も広い代替表示」を選ぶ。どれも収まらなければキーボード無しの一覧（折り返し）。
 - トレイ（他タブで出るピッカー）は従来どおり画面幅を使う。
 
+## 4.7 レイヤーボタンの位置（2026-09-22 追加）
+
+レイヤー切り替えボタンの列は、上段キーボードの**すぐ左に 1 キー分（`fontMetrics().height() × KEY_SIZE_RATIO ×
+倍率`）離して**置き、ボタン列 + 隙間 + キーボードのまとまりを中央に配置する（ズームボタンは右端のまま）。
+隙間は `QSpacerItem` で、自動フィットや手動ズームで倍率が変わるたびに更新する。自動フィットは隙間の分も
+差し引いて倍率を決める（2 回計算）。
+
+**タブ左端との揃え**: 中央配置の結果、レイヤーボタン列の左端が上段（エディタ）タブバーの左端より右に来る
+場合は、ボタン列の左端をタブバーの左端に揃える。このときキーボードは動かさず、ボタンとキーボードの隙間が
+広がる（`KeymapEditor.place_layer_column`、案内位置は `MainWindow.tab_bar_left`）。タブの増減・ウィンドウの
+リサイズ・倍率変更のたびに再配置する。
+
+```mermaid
+flowchart LR
+    A[中央配置での列左端 x] --> B{x > タブバー左端?}
+    B -- いいえ --> C[まとまりを中央配置]
+    B -- はい --> D[左スペーサーを固定幅にして列をタブ左端へ<br/>隙間 += 移動量、キーボードは据え置き]
+```
+
+## 4.6 エディタタブの配置（2026-09-22 追加）
+
+上段のエディタタブ（Keymap / Macros / …）と下段のピッカーのタブ（Basic / ISO/JIS / …）のタブバーは中央揃え。
+`main_window.py` の `self.tabs` に objectName `editor_tabs`、`tabbed_keycodes.py` の `FilteredTabbedKeycodes` に
+`picker_tabs` を付け、スタイルシートの `QTabWidget#editor_tabs::tab-bar, QTabWidget#picker_tabs::tab-bar
+{ alignment: center; }` で揃える（QMK Settings 内のタブや Key Override のタブは従来どおり左揃え）。
+
 ## 4.3 キーコードピッカーのボタン
 
 画面下半分のキーコードボタン（`tabbed_keycodes.py` が生成する `SquareButton` / `EntryCardButton`）は、
@@ -187,8 +213,12 @@ flowchart LR
 | `test_keymap_split.py::test_picker_wraps_in_landscape`（GUI） | 横長ウィンドウで折り返し幅がウィンドウの高さ、Layers タブのブロックがその幅以内で中央配置、Basic タブの代替表示もその幅以内 |
 | `test_keymap_split.py::test_picker_full_width_in_portrait`（GUI） | 縦長ウィンドウでは折り返し幅なし、ブロックは従来どおり（幅いっぱい / 中央配置） |
 | `test_keymap_split.py::test_picker_wrap_follows_resize`（GUI） | 横長から縦長にリサイズすると折り返しが外れ、戻すと再び高さ幅になる |
+| `test_keymap_split.py::test_layer_buttons_one_key_left_of_keyboard`（GUI） | レイヤーボタン列の右端とキーボード左端の間隔が 1 キー幅（±3px）で、まとまりが左端に寄っていない |
+| `test_keymap_split.py::test_layer_buttons_align_with_tab_bar`（GUI） | 案内位置が中央配置より左ならボタン列左端が案内位置に揃い、キーボードは動かない。右なら中央配置のまま |
+| `test_keymap_split.py::test_layer_button_guide_is_editor_tab_bar`（GUI） | 案内位置がエディタタブバー先頭タブの左端（グローバル x） |
+| `test_theme.py::test_editor_tabs_centred`（GUI） | エディタタブとピッカータブのタブバーの中心が、それぞれのタブウィジェットの中心と一致（±5%） |
 | `test_theme.py::test_checkbox_check_mark`（GUI） | チェック済みインジケータのスタイルに `check.svg` の `image: url(...)` があり、描画結果ではチェック時だけ緑の中に白い画素がある |
-| `test_theme.py::test_device_combobox_size`（GUI） | キーボード選択ドロップダウンのフォントがアプリ既定 + 4pt、高さが既定の 2 倍 |
+| `test_theme.py::test_device_combobox_size`（GUI） | キーボード選択ドロップダウンのフォントがアプリ既定 + 4pt、高さが既定の 1.4 倍 |
 | `test_theme.py::test_select_keyboard_icon`（GUI） | キーボードアイコン（高さ = ドロップダウン）が行の左端、その右にロゴ画像がある |
 | `test_theme.py::test_device_row_layout`（GUI） | ドロップダウン幅が最長のキーボード名に合う、Refresh がすぐ右で同じ高さ・同じフォント、両者は右詰め |
 | `test_device_combobox.py::test_split_title` | `split_title()` がメーカー名と製品名（接尾辞込み）に分ける。メーカー名の無いデバイスは owner が空で name が `title()` 全体 |

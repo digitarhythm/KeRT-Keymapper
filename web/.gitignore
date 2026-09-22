@@ -4,3 +4,4 @@ deps
 build
 via-keymap-precompiled
 .preview
+.macos-bin

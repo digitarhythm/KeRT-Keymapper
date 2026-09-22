@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Locale detection and translator installation for KeRT-mapper (docs/i18n-spec.md).
+"""Locale detection and translator installation for KeRT-Keymapper (docs/i18n-spec.md).
 
 Translations live in ``translations/kert_<lang>.ts`` (Qt Linguist XML) inside the resources directory and are
 read directly at runtime, so no ``lrelease`` / ``.qm`` step is needed. Qt's own ``qtbase_<lang>.qm`` (standard

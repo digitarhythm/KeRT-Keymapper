@@ -91,7 +91,14 @@ class Combos(BasicEditor):
         self.cards_available = []
         self.cards = []
         self.container = EntryCardContainer()
-        for x in range(128):
+        # entries are created on demand (ensure_entries), as many as the keyboard has
+
+        self.addWidget(self.container)
+
+    def ensure_entries(self, count):
+        """Create entry widgets (and their cards) until `count` exist; at most 128."""
+        while len(self.combo_entries_available) < min(count, 128):
+            x = len(self.combo_entries_available)
             entry = ComboEntryUI(x)
             entry.key_changed.connect(self.on_key_changed)
             self.combo_entries_available.append(entry)
@@ -99,9 +106,8 @@ class Combos(BasicEditor):
             card.set_title(tr("Combos", "Combo {}").format(x + 1))
             self.cards_available.append(card)
 
-        self.addWidget(self.container)
-
     def rebuild_ui(self):
+        self.ensure_entries(self.keyboard.combo_count)
         self.combo_entries = self.combo_entries_available[:self.keyboard.combo_count]
         self.cards = self.cards_available[:self.keyboard.combo_count]
         self.container.set_cards(self.cards)

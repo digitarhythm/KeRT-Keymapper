@@ -7,8 +7,8 @@
 import fbs_runtime._frozen
 
 fbs_runtime._frozen.BUILD_SETTINGS.update({
-    "app_name": "KeRT-mapper",
+    "app_name": "KeRT-Keymapper",
     "author": "digitarhythm",
-    "version": "1.0.1",
-    "mac_bundle_identifier": "io.github.digitarhythm.kert-mapper",
+    "version": "1.1.0",
+    "mac_bundle_identifier": "io.github.digitarhythm.kert-keymapper",
 })

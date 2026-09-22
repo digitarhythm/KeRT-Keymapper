@@ -20,8 +20,8 @@ cp ../icon.png .
 cp -r ../../deps/cpython/builddir/emscripten-browser/usr .
 cp ../../via-keymap-precompiled/via_keyboard_stack.json usr/local/via_keyboards.json
 cp ../../../src/main/resources/base/qmk_settings.json usr/local
-# KeRT-mapper resources: logo / icon images, the check-mark image and the UI translations
-cp ../../../src/main/resources/base/kert-mapper.png ../../../src/main/resources/base/keyboard-icon.png ../../../src/main/resources/base/check.svg usr/local
+# KeRT-Keymapper resources: logo / icon images, the check-mark image and the UI translations
+cp ../../../src/main/resources/base/kert-keymapper.png ../../../src/main/resources/base/keyboard-icon.png ../../../src/main/resources/base/check.svg usr/local
 cp -r ../../../src/main/resources/base/translations usr/local/translations
 # Japanese glyphs for the Qt wasm build (subset of Noto Sans CJK JP, see ../make_font_subset.py)
 mkdir -p usr/local/fonts && cp ../fonts/kert-ja.otf ../fonts/OFL.txt usr/local/fonts/
@@ -95,7 +95,12 @@ emcc \
 cp ../index.html .
 cp ../kert-serviceworker.js ../coi-serviceworker.LICENSE .
 cat ../worker.js >> main-${UNIQVER}.worker.js
-sed -i 's+err("worker sent an unknown command+my_onmessage(e);return;err("worker sent an unknown command/+g' main-${UNIQVER}.js
+# route the worker's own messages (notify_alive, notify_ready, write_device, ...) to the page: hook the
+# spot where emscripten would complain about an unknown command (a string literal up to 3.1.x, a
+# template literal in newer versions)
+sed -i -e 's+err("worker sent an unknown command+my_onmessage(e);return;err("worker sent an unknown command/+g' \
+       -e 's+err(`worker sent an unknown command+my_onmessage(e);return;err(`worker sent an unknown command+g' main-${UNIQVER}.js
+grep -q "my_onmessage(e);return;" main-${UNIQVER}.js || { echo "ERROR: could not hook the worker message handler in main-${UNIQVER}.js"; exit 1; }
 
 rm -rf usr
 

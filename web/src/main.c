@@ -79,7 +79,7 @@ void vialglue_set_response_error(uint8_t *data) {
     glue_ready = 1;
 }
 
-const char *g_device_desc;
+const char *g_device_desc = "";
 
 void vialglue_set_device_desc(const char *s) {
     g_device_desc = s;
@@ -167,7 +167,22 @@ static PyObject* vialglue_fatal_error(PyObject *self, PyObject *args) {
     return PyLong_FromLong(0);
 }
 
+static PyObject* vialglue_progress(PyObject *self, PyObject *args) {
+    const char *step;
+    int done, total;
+
+    if (!PyArg_ParseTuple(args, "sii", &step, &done, &total))
+        return NULL;
+
+    EM_ASM({
+        postMessage({cmd: "progress", step: UTF8ToString($0), done: $1, total: $2});
+    }, step, done, total);
+
+    return PyLong_FromLong(0);
+}
+
 static PyMethodDef VialglueMethods[] = {
+    {"progress",  vialglue_progress, METH_VARARGS, ""},
     {"write_device",  vialglue_write_device, METH_VARARGS, ""},
     {"read_device",  vialglue_read_device, METH_VARARGS, ""},
     {"unlock_start",  vialglue_unlock_start, METH_VARARGS, ""},

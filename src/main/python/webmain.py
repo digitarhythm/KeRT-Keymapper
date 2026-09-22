@@ -12,6 +12,7 @@ import json
 from main_window import MainWindow
 import branding_theme
 import branding_i18n
+import startup_progress
 
 
 # http://timlehr.com/python-exception-hooks-with-qt-message-box/
@@ -59,7 +60,20 @@ def web_get_resource(name):
     return "/usr/local/" + name
 
 
-def main(app):
+def _schedule_notify_ready():
+    """Tell the page the app is up (closes the start screen); a no-op outside the browser."""
+    if sys.platform == "emscripten":
+        import vialglue
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(100, vialglue.notify_ready)
+
+
+def preload(app):
+    """Everything that does not need the keyboard: imports, fonts, the (hidden) main window.
+
+    The page calls this as soon as the runtime is alive, before the user has chosen a keyboard, so that
+    main() afterwards only has to connect and load (docs/web-startup-preload-spec.md)."""
+    global window
     font = app.font()
     font.setPointSize(10)
     app.setFont(font)
@@ -67,14 +81,28 @@ def main(app):
     app.get_resource = web_get_resource
     with open(app.get_resource("build_settings.json"), "r") as inf:
         app.build_settings = json.loads(inf.read())
-    qt_exception_hook = UncaughtHook()
+    app.qt_exception_hook = UncaughtHook()
 
-    # Not sure of the best way to do this.
-    global window
     branding_theme.register()
     branding_i18n.install(app, app.get_resource)
     branding_i18n.install_bundled_font(app, app.get_resource)
+    app.preloaded = True          # MainWindow: do not announce readiness yet
     window = MainWindow(app)
+    app.processEvents()
+
+
+def main(app):
+    """Start with the keyboard the user chose: connect, load, show."""
+    global window
+    startup_progress.report("connect")
+    if window is None:
+        preload(app)
+    # the device is available now (the page set its descriptor): take it in and connect
+    window.autorefresh.update(quiet=False, hard=True)
+    startup_progress.report("layout")
     window.show()
+    app.processEvents()
+    startup_progress.report("ready")
+    _schedule_notify_ready()
 
     app.processEvents()

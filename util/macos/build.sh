@@ -31,30 +31,30 @@ fi
 cd "$ROOT"
 mkdir -p "$OUT"
 
-# --- icon: build KeRT-mapper.icns from the PNGs fbs would have used
-ICONSET="$OUT/KeRT-mapper.iconset"
+# --- icon: build KeRT-Keymapper.icns from the PNGs fbs would have used
+ICONSET="$OUT/KeRT-Keymapper.iconset"
 rm -rf "$ICONSET" && mkdir -p "$ICONSET"
 for size in 16 32 64 128 256 512; do
     sips -z $size $size src/main/icons/mac/1024.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
     double=$((size * 2))
     sips -z $double $double src/main/icons/mac/1024.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$OUT/KeRT-mapper.icns"
+iconutil -c icns "$ICONSET" -o "$OUT/KeRT-Keymapper.icns"
 
 # --- freeze
 VIAL_ARCH="$ARCH" "$PY" -m PyInstaller --noconfirm --clean \
     --distpath "$OUT/dist" --workpath "$OUT/build" \
-    util/macos/KeRT-mapper.spec
+    util/macos/KeRT-Keymapper.spec
 
 # --- sanity check: the main executable must be the requested architecture
-lipo -archs "$OUT/dist/KeRT-mapper.app/Contents/MacOS/KeRT-mapper" | grep -qx "$ARCH"
+lipo -archs "$OUT/dist/KeRT-Keymapper.app/Contents/MacOS/KeRT-Keymapper" | grep -qx "$ARCH"
 
 # --- dmg
-DMG="$OUT/kert-mapper-mac-$ARCH.dmg"
+DMG="$OUT/kert-keymapper-mac-$ARCH.dmg"
 rm -f "$DMG"
-hdiutil create -volname KeRT-mapper -srcfolder "$OUT/dist/KeRT-mapper.app" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname KeRT-Keymapper -srcfolder "$OUT/dist/KeRT-Keymapper.app" -ov -format UDZO "$DMG" >/dev/null
 
 echo
 echo "arch: $ARCH"
-echo "app:  $OUT/dist/KeRT-mapper.app"
+echo "app:  $OUT/dist/KeRT-Keymapper.app"
 echo "dmg:  $DMG"
