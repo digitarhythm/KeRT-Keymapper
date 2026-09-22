@@ -56,8 +56,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "KeRT-Keymapper",
         "CFBundleDisplayName": "KeRT-Keymapper",
-        "CFBundleShortVersionString": "1.1.2",
-        "CFBundleVersion": "1.1.2",
+        "CFBundleShortVersionString": "1.1.3",
+        "CFBundleVersion": "1.1.3",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": MIN_OS,
     },

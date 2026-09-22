@@ -51,3 +51,14 @@ def test_other_keyboard_button_says_connect():
     assert 'other: "別のキーボードを接続"' in html
     assert 'other: "Connect another keyboard"' in html
     assert "別のキーボードを選択" not in html
+
+
+def test_app_script_loaded_only_when_isolated():
+    """main-*.js (needs SharedArrayBuffer) is added only when the page is cross-origin isolated, so a
+    hard reload that bypasses the service worker shows a message instead of an uncaught error"""
+    html = page()
+    assert '<script src="main-@UNIQVER@.js">' not in html
+    loader = html[html.index("if (window.crossOriginIsolated) {"):html.index("</script>", html.index("if (window.crossOriginIsolated) {"))]
+    assert 'app_script.src = "main-@UNIQVER@.js"' in loader
+    assert "show_error(T.no_isolation)" in loader
+    assert 'no_isolation: "ブラウザがこのページを隔離モード' in html and 'no_isolation: "The browser could not open' in html

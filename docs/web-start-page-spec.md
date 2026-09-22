@@ -62,6 +62,27 @@ flowchart TD
 接続の処理（`connectTo(device)`）は現在の `connect()` の後半をそのまま使う（`open()`、レポート受信、
 デバイス情報の設定、Python 起動）。接続中はボタン類を無効にし、文言を「接続中…」にする。
 
+### 3.x 隔離モードでないときの扱い（2026-09-23 追加）
+
+アプリ本体（`main-*.js`）は SharedArrayBuffer を使うため、ページが cross-origin isolated（COOP/COEP）
+のときしか動かない。GitHub Pages ではサービスワーカーがヘッダーを付けるが、初回訪問や強制再読み込み
+（Shift + 再読み込み）ではサービスワーカーを通らずにページが読み込まれ、`SharedArrayBuffer is not defined`
+がそのまま `window.onerror` の alert に出ていた。対策として `main-*.js` は `window.crossOriginIsolated` が
+真のときだけ動的に追加し、偽のときはサービスワーカー側の自動再読み込みに任せる。4 秒たっても隔離されない
+場合は案内文（`no_isolation`、日本語 / 英語）をエラー欄に出す。
+
+```mermaid
+flowchart TD
+    A[ページ読み込み] --> B{crossOriginIsolated?}
+    B -- はい --> C[main-*.js を追加してアプリ起動]
+    B -- いいえ --> D[サービスワーカーが制御を得たら自動再読み込み]
+    D --> E{4 秒以内に隔離された?}
+    E -- いいえ --> F[no_isolation の案内を表示]
+```
+
+ローカル確認: `KERT_NO_ISOLATION=1 python3 web/dev_server.py` でヘッダーなしの配信になり、Pages での
+強制再読み込みと同じ状態を再現できる。
+
 ## 4. 国際化
 
 ページの文言は `index.html` 内の辞書 `STRINGS = {ja: {...}, en: {...}}` から、`navigator.language` が

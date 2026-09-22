@@ -28,7 +28,7 @@ SRC = os.path.join(HERE, "src")
 SITE = "https://digitarhythm.github.io/KeRT-Keymapper/"
 PREVIEW = os.path.join(HERE, ".preview")
 PORT = 8765
-MAIN_JS = re.compile(r'src="(main-([0-9a-f]{64})\.js)"')
+MAIN_JS = re.compile(r'(main-([0-9a-f]{64})\.js)')   # in src="…" or in the isolation-guarded loader
 SHELL_FILES = ("kert-serviceworker.js", "coi-serviceworker.LICENSE", "icon.png")
 
 
@@ -80,9 +80,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # what the service worker adds on GitHub Pages: cross-origin isolation for SharedArrayBuffer
-        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
-        self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
+        # (KERT_NO_ISOLATION=1 leaves them out, to try the page the way a hard reload on Pages sees it)
+        if not os.environ.get("KERT_NO_ISOLATION"):
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+            self.send_header("Cross-Origin-Resource-Policy", "cross-origin")
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 

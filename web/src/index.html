@@ -282,7 +282,8 @@ body {
             requesting: "キーボードを選択してください…",
             connecting: "接続中…",
             starting: "起動中",
-            open_failed: "キーボードを開けませんでした: {error}。他のプログラム（デスクトップ版など）がキーボードを使っていないか確認してください。"
+            open_failed: "キーボードを開けませんでした: {error}。他のプログラム（デスクトップ版など）がキーボードを使っていないか確認してください。",
+            no_isolation: "ブラウザがこのページを隔離モード（cross-origin isolation）で開けませんでした。ページを再読み込みしてください。強制再読み込み（Shift を押しながらの再読み込み）では動きません。"
         },
         en: {
             intro: "Before KeRT-Keymapper can start, the browser has to be given access to the connected keyboard. " +
@@ -298,7 +299,8 @@ body {
             requesting: "Pick a keyboard\u2026",
             connecting: "Connecting\u2026",
             starting: "Starting up",
-            open_failed: "Could not open the keyboard: {error}. Check that no other program (e.g. the desktop app) is using it."
+            open_failed: "Could not open the keyboard: {error}. Check that no other program (e.g. the desktop app) is using it.",
+            no_isolation: "The browser could not open this page cross-origin isolated. Reload the page (a hard reload, Shift + reload, bypasses the service worker and does not work)."
         }
     };
     var T = STRINGS[(navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en"];
@@ -657,8 +659,21 @@ body {
     window.onerror = function(message, source, lineno, colno, error) {
         alert(message);
     };
-</script>
 
-<script src="main-@UNIQVER@.js"></script>
+    // The app (main-*.js) needs SharedArrayBuffer, which only exists when the page is cross-origin
+    // isolated. That is the service worker's job on GitHub Pages; a hard reload (or the very first
+    // visit) loads the page without it, and kert-serviceworker.js then reloads the page by itself once
+    // it controls it. So only load the app when isolated, instead of letting main-*.js throw
+    // "SharedArrayBuffer is not defined" into the alert above. If no reload comes, say what happened.
+    if (window.crossOriginIsolated) {
+        var app_script = document.createElement("script");
+        app_script.src = "main-@UNIQVER@.js";
+        document.body.appendChild(app_script);
+    } else {
+        setTimeout(function () {
+            if (!window.crossOriginIsolated) show_error(T.no_isolation);
+        }, 4000);
+    }
+</script>
 
 </body>
