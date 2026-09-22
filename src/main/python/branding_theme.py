@@ -108,8 +108,8 @@ def stylesheet(name):
             color: {hlt};
             border-color: {hl};
         }}
-        QTabWidget#editor_tabs::tab-bar, QTabWidget#picker_tabs::tab-bar {{
-            alignment: center;
+        QTabWidget::tab-bar {{
+            alignment: center;   /* every tab bar: editors, picker, and the tabs inside Macros / Key Override / Alt Repeat Key / QMK Settings */
         }}
         QTabBar::tab {{
             border: {w}px solid {mid};

@@ -473,3 +473,26 @@ def test_editor_tabs_centred(qtbot):
     qtbot.waitUntil(lambda: pbar.width() > 0 and ak.width() > 1000)
     pbar_centre = pbar.mapTo(ak, pbar.rect().center()).x()
     assert abs(pbar_centre - ak.width() / 2) < ak.width() * 0.05
+
+
+def test_inner_editor_tabs_centred(qtbot):
+    """ The tab bars inside the Macros, Key Override, Alt Repeat Key and QMK Settings editors are centred too """
+    from test_gui import prepare, FAKE_KEYBOARD
+
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD)
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    mw.resize(1600, 1000)
+    assert "QTabWidget::tab-bar {" in QApplication.instance().styleSheet()
+    checked = 0
+    for editor, label in ((mw.macro_recorder, "Macros"), (mw.key_override, "Key Overrides"),
+                          (mw.alt_repeat_key, "Alt Repeat Key"), (mw.qmk_settings, "QMK Settings")):
+        tabs = getattr(editor, "tabs", None) or getattr(editor, "tabs_widget", None)
+        if not editor.valid() or label not in mw._tab_labels or tabs.count() == 0:
+            continue
+        mw.tabs.setCurrentIndex(mw._tab_labels.index(label))    # show it so the bar gets laid out
+        bar = tabs.tabBar()
+        qtbot.waitUntil(lambda: bar.isVisible() and bar.width() > 0 and tabs.width() > 500)
+        bar_centre = bar.mapTo(tabs, bar.rect().center()).x()
+        assert abs(bar_centre - tabs.width() / 2) < tabs.width() * 0.05, label
+        checked += 1
+    assert checked >= 1     # the virtual test keyboard only has Macros of these

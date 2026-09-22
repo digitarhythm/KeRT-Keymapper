@@ -179,10 +179,10 @@ flowchart LR
 
 ## 4.6 エディタタブの配置（2026-09-22 追加）
 
-上段のエディタタブ（Keymap / Macros / …）と下段のピッカーのタブ（Basic / ISO/JIS / …）のタブバーは中央揃え。
-`main_window.py` の `self.tabs` に objectName `editor_tabs`、`tabbed_keycodes.py` の `FilteredTabbedKeycodes` に
-`picker_tabs` を付け、スタイルシートの `QTabWidget#editor_tabs::tab-bar, QTabWidget#picker_tabs::tab-bar
-{ alignment: center; }` で揃える（QMK Settings 内のタブや Key Override のタブは従来どおり左揃え）。
+上段のエディタタブ（Keymap / Macros / …）と下段のピッカーのタブ（Basic / ISO/JIS / …）に加え、Macros /
+Key Override / Alt Repeat Key / QMK Settings の中にあるタブバーも中央揃え（2026-09-23 変更: 当初は上段と下段だけ
+だったが、内側のタブが左寄せのままで不揃いだった）。スタイルシートの `QTabWidget::tab-bar { alignment: center; }`
+で全タブウィジェットに適用する。`editor_tabs` / `picker_tabs` の objectName はそのまま残す。
 
 ## 4.3 キーコードピッカーのボタン
 
