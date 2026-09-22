@@ -3,3 +3,4 @@ sources
 deps
 build
 via-keymap-precompiled
+.preview

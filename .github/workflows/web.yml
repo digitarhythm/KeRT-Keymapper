@@ -14,13 +14,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # The emscripten SDK and the wasm builds of CPython, Qt and PyQt5 take ~40 minutes and only change
+    # when their versions or patches do; cache them so a normal run only links the app (a few minutes).
+    - uses: actions/cache@v4
+      id: deps
+      with:
+        path: |
+          web/emsdk
+          web/deps
+        key: web-deps-${{ runner.os }}-${{ hashFiles('web/version.sh', 'web/fetch-emsdk.sh', 'web/fetch-deps.sh', 'web/build-deps.sh', 'web/patches/**') }}
+
+    - name: Build dependencies
+      if: steps.deps.outputs.cache-hit != 'true'
+      run: |
+        cd web
+        ./fetch-emsdk.sh
+        ./fetch-deps.sh
+        ./build-deps.sh
+
     - name: Build
       run: |
         cd web
         git clone --depth 1 https://github.com/vial-kb/via-keymap-precompiled.git
-        ./fetch-emsdk.sh
-        ./fetch-deps.sh
-        ./build-deps.sh
         cd src
         ./build.sh
 

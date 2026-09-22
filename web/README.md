@@ -18,6 +18,15 @@ the app repository (until 2026-09-22 it lived in `digitarhythm/KeRT-mapper-web`)
 - The workflow `.github/workflows/web.yml` builds and deploys on every version tag (`v*`) and on manual
   dispatch (the emscripten build of Qt and CPython takes about 45 minutes).
 
+## Quick preview of page changes
+
+Changes to the page shell (`src/index.html`, `src/kert-serviceworker.js`, `src/icon.png`) do not need a
+build: `python3 web/dev_server.py` downloads the published build once, lays your local page over it and
+serves everything on http://localhost:8765 with the COOP/COEP headers, so the app runs (keyboard included)
+and a reload shows the change. Python and resource changes live inside the `.data` file and still need a
+build; the CI caches the emscripten toolchain and the Qt/CPython builds, so a build after the first one
+takes a few minutes instead of 45.
+
 ## Building locally
 
 ```
