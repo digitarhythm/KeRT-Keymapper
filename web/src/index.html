@@ -35,6 +35,7 @@ body {
     background-color: rgba(0, 0, 0, 0.55);
 }
 #startup_inner {
+    position: relative;     /* the big spinner is centred on this card */
     background-color: #f5f6f8;
     border: 3px solid #303030;
     border-radius: 10px;
@@ -123,24 +124,31 @@ body {
     cursor: default;
     opacity: 0.6;
 }
-/* the keyboard being connected: KeRT green, a spinner laid over the name */
+/* the keyboard being connected: KeRT green (the spinner is the big one over the card, #big_spinner) */
 .known_name.selected, .known_name.selected:disabled {
-    position: relative;
     background-color: #00a3a3;
     color: #ffffff;
     opacity: 1;
 }
-.known_name.selected .spinner {
+/* large loading spinner centred over the selection card while a chosen keyboard connects and starts */
+#big_spinner {
+    display: none;
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 0.8em;
-    height: 0.8em;
-    margin: -0.4em 0 0 -0.4em;
-    border: 3px solid rgba(48, 48, 48, 0.3);
+    width: 5em;
+    height: 5em;
+    margin: -2.5em 0 0 -2.5em;
+    box-sizing: border-box;
+    border: 8px solid rgba(48, 48, 48, 0.25);
     border-top-color: #303030;
     border-radius: 50%;
+    background-color: rgba(245, 246, 248, 0.7);
     animation: kert-spin 0.8s linear infinite;
+    pointer-events: none;
+}
+#big_spinner.shown {
+    display: block;
 }
 /* start-up progress under the chosen keyboard (where the "another keyboard" button was) */
 #progress {
@@ -239,6 +247,7 @@ body {
             <p id="error_msg"></p>
             <p id="support_note"></p>
         </div>
+        <div id="big_spinner"></div>
     </div>
     <div id="version">KeRT-Keymapper: @VIAL_VER@<br>Web: @WEB_VER@<br>Support: @VIA_STACK_VER@</div>
 </div>
@@ -352,16 +361,14 @@ body {
         progress_render();
     }
 
-    // known-keyboard panel while connecting / starting: the chosen box turns green with a spinner over
-    // its name, the other boxes are disabled and the "another keyboard" button is hidden
+    // known-keyboard panel while connecting / starting: the chosen box turns green, a big spinner sits
+    // in the middle of the card, the other boxes are disabled and the "another keyboard" button is hidden
     function set_known_status(text, busy) {
         document.querySelectorAll("#known_list .known_name").forEach(function (b) {
             b.disabled = !!busy;
-            if (!busy) {
-                b.classList.remove("selected");
-                b.querySelectorAll(".spinner").forEach(function (sp) { sp.remove(); });
-            }
+            if (!busy) b.classList.remove("selected");
         });
+        document.getElementById("big_spinner").classList.toggle("shown", !!busy);
         // the progress bar takes the button's place while connecting, so nothing else moves
         document.getElementById("other_btn").style.display = busy ? "none" : "";
         document.getElementById("other_btn").disabled = !!busy;
@@ -372,11 +379,6 @@ body {
 
     function select_box(box) {
         box.classList.add("selected");
-        if (!box.querySelector(".spinner")) {
-            var sp = document.createElement("span");
-            sp.className = "spinner";
-            box.appendChild(sp);
-        }
     }
 
     var Module = {};
