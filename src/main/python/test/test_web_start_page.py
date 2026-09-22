@@ -43,3 +43,11 @@ def test_no_small_spinner_over_the_name():
     fn = html[html.index("function select_box"):html.index("var Module")]
     assert "spinner" not in fn, "the chosen box only turns green; the spinner is the big one on the card"
     assert ".known_name.selected .spinner" not in html
+
+
+def test_other_keyboard_button_says_connect():
+    """The button under the known-keyboard list reads "connect another keyboard" (ja / en)"""
+    html = page()
+    assert 'other: "別のキーボードを接続"' in html
+    assert 'other: "Connect another keyboard"' in html
+    assert "別のキーボードを選択" not in html
