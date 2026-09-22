@@ -105,15 +105,15 @@ flowchart LR
   （`title()`）の幅には依存しない。高さは従来の 2 倍（`setMinimumHeight`）のままで、2 行が収まる。
 - プルダウンの各行は `DeviceItemDelegate` が同じ 2 段レイアウトで描き、`sizeHint()` の高さは 2 行分。
 
-## 4.4 キーマップ画面の上下比率と自動フィット（2026-09-21 追加）
+## 4.4 キーマップ画面の上下比率と自動フィット（2026-09-21 追加、2026-09-22 に 4:6 へ）
 
 Keymap タブは上段（キーボード）と下段（キーコードピッカー）を縦の `RatioSplitter`（`QSplitter` 派生、
-`editor/keymap_editor.py`）で分け、比率は **3 : 7**（`SPLIT_RATIO`）。ウィンドウのリサイズごとに比率を
+`editor/keymap_editor.py`）で分け、比率は **4 : 6**（`SPLIT_RATIO`。2026-09-22 に 3:7 から変更）。ウィンドウのリサイズごとに比率を
 かけ直すが、ユーザーがハンドルをドラッグした後はその位置を保つ。ハンドル幅は `LAYOUT_SPACING`（3px）。
 
 ```mermaid
 flowchart TD
-    R["ウィンドウ / スプリッタのリサイズ"] --> S["RatioSplitter.apply_ratio()<br/>上 3 : 下 7"]
+    R["ウィンドウ / スプリッタのリサイズ"] --> S["RatioSplitter.apply_ratio()<br/>上 4 : 下 6"]
     S --> A["上段 ClickableWidget.resized"]
     A --> F["KeymapEditor.fit_keyboard()"]
     F -->|auto_fit| C["KeyboardWidget.fit_scale(空き幅, 空き高さ, 上限 3.0)"]
@@ -181,7 +181,7 @@ flowchart LR
 | `test_theme.py::test_selected_uses_background`（GUI） | スタイルシートで選択タブと checked ボタンの背景が Highlight 色になる |
 | `test_theme.py::test_layout_spacing`（GUI） | `KeRT Light` 適用時に `style().pixelMetric()` の余白・間隔が 3、他テーマでは Fusion の既定値 |
 | `test_theme.py::test_selected_key_filled`（GUI） | 選択中のキーの内側が Highlight 色、刻印が HighlightedText 色で描かれる |
-| `test_keymap_split.py::test_top_bottom_split`（GUI） | 上下が `RatioSplitter` で 3:7、リサイズ後も 3:7 |
+| `test_keymap_split.py::test_top_bottom_split`（GUI） | 上下が `RatioSplitter` で 4:6、リサイズ後も 4:6 |
 | `test_keymap_split.py::test_keyboard_auto_fit`（GUI） | 倍率が `fit_scale()` と一致し、キーボードが空き領域に収まり、幅か高さが埋まっている（または上限）。縮小後も収まる |
 | `test_keymap_split.py::test_manual_zoom_stops_auto_fit`（GUI） | `+` で倍率が上がり自動フィットが切れ、リサイズしても倍率が変わらない |
 | `test_keymap_split.py::test_picker_wraps_in_landscape`（GUI） | 横長ウィンドウで折り返し幅がウィンドウの高さ、Layers タブのブロックがその幅以内で中央配置、Basic タブの代替表示もその幅以内 |

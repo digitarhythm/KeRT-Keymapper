@@ -24,18 +24,18 @@ def test_top_bottom_split(qtbot):
     from editor.keymap_editor import RatioSplitter, SPLIT_RATIO
 
     mw, ke = prepared(qtbot)
-    assert isinstance(ke.splitter, RatioSplitter) and SPLIT_RATIO == (3, 7)
+    assert isinstance(ke.splitter, RatioSplitter) and SPLIT_RATIO == (4, 6)
     top, bottom = ke.splitter.sizes()
     assert ke.splitter.widget(0) is ke.keyboard_area and ke.splitter.widget(1) is ke.tabbed_keycodes
     # only one picker (the unfiltered one) is visible; the masked-key picker stays hidden until needed
     assert ke.tabbed_keycodes.all_keycodes.isVisible() and ke.tabbed_keycodes.basic_keycodes.isHidden()
-    assert abs(top / (top + bottom) - 0.3) < 0.02
+    assert abs(top / (top + bottom) - 0.4) < 0.02
 
     # the ratio survives a window resize
     mw.resize(1600, 1200)
     qtbot.waitUntil(lambda: ke.splitter.height() >= 1000)
     top, bottom = ke.splitter.sizes()
-    assert abs(top / (top + bottom) - 0.3) < 0.02
+    assert abs(top / (top + bottom) - 0.4) < 0.02
 
 
 def test_keyboard_auto_fit(qtbot):

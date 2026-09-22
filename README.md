@@ -17,7 +17,7 @@ keyboard that works with Vial works with KeRT-mapper.
   QMK settings, matrix tester, lighting, firmware updater.
 - **Cards instead of codes** – tap dance, combo, HostOS and macro entries are shown as cards with their
   contents, both in the editors and in the keycode picker.
-- **Light, flat look** – the "KeRT Light" theme, flat keys, a two-line keyboard selector, a 30/70 split
+- **Light, flat look** – the "KeRT Light" theme, flat keys, a two-line keyboard selector, a 40/60 split
   between keyboard and keycode picker with the keyboard scaled to fit.
 - **Japanese UI** – follows the system (or browser) language; English otherwise. Keycode names and tab
   labels stay English on purpose.
@@ -135,7 +135,7 @@ KeRT-mapper は、Vial 対応キーボード（QMK + Vial ファームウェア�
 - **HostOS キー**: 1 つのキーで、接続先が macOS / Windows / Linux のどれかに応じて別のキーコードを送ります
   （ファームウェア側は OS 検出付きの vial-qmk フォークでビルドしてください）。
 - **カード表示**: Tap Dance、Combo、HostOS、マクロの設定内容をカードで表示します（エディタ、キーコード一覧とも）。
-- **白基調のフラットな見た目**、キーボード名の 2 段表示、上下 3:7 のキーマップ画面。
+- **白基調のフラットな見た目**、キーボード名の 2 段表示、上下 4:6 のキーマップ画面。
 - **日本語 UI**: OS（ブラウザ版はブラウザ）の言語設定に従います。キーコード名とタブ名は英語のままです。
 
 **入手**: ブラウザ版は https://digitarhythm.github.io/KeRT-mapper/ （Chrome / Edge などの Chromium 系）、

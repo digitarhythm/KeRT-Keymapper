@@ -118,6 +118,26 @@ body {
     Module.canvas = document.getElementById("canvas");
     Module.qtCanvasElements = [Module.canvas];
 
+    // Qt 5.14's WebAssembly platform expects macOS to deliver "natural" (inverted) wheel deltas and, in this
+    // build, is never told about the actual setting, so wheel scrolling inside the app ran backwards on Macs.
+    // Flip the deltas before Qt's own listener (registered later, non-capturing) sees them.
+    if (/Mac/.test(navigator.platform)) {
+        Module.canvas.addEventListener("wheel", function (e) {
+            if (e.kertFlipped) return;
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            var flipped = new WheelEvent("wheel", {
+                deltaX: -e.deltaX, deltaY: -e.deltaY, deltaZ: e.deltaZ, deltaMode: e.deltaMode,
+                clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+                button: e.button, buttons: e.buttons,
+                ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+                bubbles: true, cancelable: true
+            });
+            flipped.kertFlipped = true;
+            e.target.dispatchEvent(flipped);
+        }, {capture: true, passive: false});
+    }
+
     function read_timeout() {
         console.log("device read timed out!");
         _vialglue_set_response_error();

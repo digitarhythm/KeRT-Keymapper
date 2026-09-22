@@ -15,7 +15,7 @@ from vial_device import VialKeyboard
 from branding_theme import LAYOUT_SPACING
 
 # keyboard (top) : keycode picker (bottom)
-SPLIT_RATIO = (3, 7)
+SPLIT_RATIO = (4, 6)
 # auto-fit never enlarges the keys beyond this (tiny macro pads would otherwise fill the screen)
 MAX_FIT_SCALE = 3.0
 
