@@ -62,3 +62,23 @@ def test_app_script_loaded_only_when_isolated():
     assert 'app_script.src = "main-@UNIQVER@.js"' in loader
     assert "show_error(T.no_isolation)" in loader
     assert 'no_isolation: "ブラウザがこのページを隔離モード' in html and 'no_isolation: "The browser could not open' in html
+
+
+SW = os.path.realpath(os.path.join(os.path.dirname(__file__), "../../../../web/src/kert-serviceworker.js"))
+
+
+def test_service_worker_does_not_cache_on_localhost():
+    """The local preview relinks under the same hash, so the service worker must not serve cached
+    build files there (and drops any it has); on GitHub Pages the hashed files stay cache-first"""
+    with open(SW, encoding="utf-8") as f:
+        sw = f.read()
+    assert "const DEV = " in sw and "localhost" in sw
+    assert '!DEV && request.method === "GET" && HASHED_ASSET.test' in sw
+    assert "DEV || k !== CACHE_NAME" in sw
+    assert 'CACHE_NAME = "kert-keymapper-assets-v3"' in sw, "new cache name: mixed old entries are dropped"
+
+
+def test_error_alert_shows_worker_error_text():
+    html = page()
+    handler = html[html.index("window.onerror = function"):html.index("};", html.index("window.onerror = function"))]
+    assert "message.message" in handler

@@ -7,6 +7,10 @@ from protocol.dummy_keyboard import DummyKeyboard
 from util import MSG_LEN, pad_for_vibl
 
 
+class DeviceOpenError(RuntimeError):
+    """The HID device could not be opened (typically another program has it)"""
+
+
 class VialDevice:
 
     def __init__(self, dev):
@@ -17,13 +21,15 @@ class VialDevice:
 
     def open(self, override_json=None):
         self.dev = hid.device()
-        for x in range(10):
+        # a keyboard that was just plugged in can take a moment; one that another program holds open
+        # never succeeds, so give up after a few seconds rather than ten
+        for x in range(3):
             try:
                 self.dev.open_path(self.desc["path"])
                 return
             except OSError:
                 time.sleep(1)
-        raise RuntimeError("unable to open the device")
+        raise DeviceOpenError("unable to open the device")
 
     def send(self, data):
         # add 00 at start for hidapi report id

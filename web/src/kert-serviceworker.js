@@ -6,10 +6,15 @@
  * The isolation part is coi-serviceworker v0.1.7 by Guido Zuidhof and contributors (MIT, see
  * coi-serviceworker.LICENSE), rewritten unminified; the caching part is ours.
  */
-const CACHE_NAME = "kert-keymapper-assets-v2";
+const CACHE_NAME = "kert-keymapper-assets-v3";
 // main-<sha256>.wasm / .data / .js / .worker.js and datafile_main-<sha256>.data: the hash changes
 // whenever the content does, so a cached copy can be served forever
 const HASHED_ASSET = /\/(datafile_)?main-[0-9a-f]{64}\.(wasm|data|js|worker\.js)$/;
+// The local preview (web/dev_server.py) relinks the build without changing the hash (it is the git
+// commit), so cached files would go stale and mismatch the fresh ones ("Cannot read properties of
+// undefined (reading 'apply')"): no caching there, and whatever was cached is dropped.
+const DEV_HOSTS = /^(localhost|127\.0\.0\.1|\[::1\])$/;
+const DEV = typeof self !== "undefined" && self.location && DEV_HOSTS.test(self.location.hostname);
 
 let coepCredentialless = false;
 
@@ -18,7 +23,7 @@ if (typeof window === "undefined") {
     self.addEventListener("install", () => self.skipWaiting());
     self.addEventListener("activate", (event) => event.waitUntil(
         caches.keys()
-            .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+            .then((keys) => Promise.all(keys.filter((k) => DEV || k !== CACHE_NAME).map((k) => caches.delete(k))))
             .then(() => self.clients.claim())
     ));
 
@@ -48,7 +53,7 @@ if (typeof window === "undefined") {
         const outgoing = coepCredentialless && request.mode === "no-cors"
             ? new Request(request, {credentials: "omit"}) : request;
 
-        if (request.method === "GET" && HASHED_ASSET.test(new URL(request.url).pathname)) {
+        if (!DEV && request.method === "GET" && HASHED_ASSET.test(new URL(request.url).pathname)) {
             event.respondWith(caches.open(CACHE_NAME).then((cache) =>
                 cache.match(request).then((cached) => {
                     if (cached) return withIsolationHeaders(cached);

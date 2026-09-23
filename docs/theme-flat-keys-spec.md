@@ -130,32 +130,38 @@ flowchart TD
 
 ## 4.5 下段ピッカーの折り返し幅（2026-09-21 追加、同日改訂）
 
-Keymap タブの下段ピッカーの折り返し幅は、**ウィンドウの縦横比**で決める（上段キーボードの幅には
-依存しない。マクロパッドのような狭いキーボードで極端に狭くならないため）。
+Keymap タブの下段ピッカーの折り返し幅は、**ウィンドウの縦横比と幅**で決める（上段キーボードの幅には
+依存しない。マクロパッドのような狭いキーボードで極端に狭くならないため）。横長では幅の 75 % なので、
+1600px 幅のウィンドウなら 1200px。Quantum の広い修飾キー配置（約 1300px）は幅 1740px 以上で出る。
 
 | ウィンドウ | 折り返し幅 | 配置 |
 | --- | --- | --- |
 | 縦長（高さ > 幅） | 画面幅いっぱい（従来どおり） | ブロックは中央配置（幅いっぱいなので実質そのまま） |
-| 横長（幅 ≥ 高さ） | **ウィンドウの高さと同じ幅** | ブロックは中央配置（中身は左詰め。2026-09-21 の指示で左寄せから変更） |
+| 横長（幅 ≥ 高さ） | **ウィンドウ幅の 75 %**（`PICKER_WRAP_RATIO`。2026-09-23 変更、それまではウィンドウの高さ） | ブロックは中央配置（中身は左詰め。2026-09-21 の指示で左寄せから変更） |
 
 ```mermaid
 flowchart LR
     R["ウィンドウのリサイズ / キーボード読み込み"] --> W["KeymapEditor.update_picker_wrap()"]
     W -->|"高さ > 幅"| P["wrap_width = None（幅いっぱい）"]
-    W -->|"幅 ≥ 高さ"| L["wrap_width = ウィンドウの高さ"]
+    W -->|"幅 ≥ 高さ"| L["wrap_width = ウィンドウ幅 × 0.75"]
     P --> T["TabbedKeycodes.set_wrap_width()"]
     L --> T
-    T --> A["AlternativeDisplay:<br/>ブロック幅 = min(スクロール領域幅, wrap_width, 1 行に並べた幅)<br/>ブロックは中央配置、中身は左詰め"]
+    T --> A["AlternativeDisplay:<br/>ブロック幅 = min(スクロール領域幅, wrap_width, max(並びの幅, 1 行に並べた幅))<br/>ブロックは中央配置、中身は左詰め"]
     T --> S["Tab.select_alternative():<br/>wrap_width に収まる最も広い代替表示"]
 ```
 
 - `KeymapEditor.update_picker_wrap()` は上段ペインのリサイズ（ウィンドウのリサイズを含む）とキーボード
-  読み込みのたびに呼ばれ、`keyboard_area.window()` の幅と高さから折り返し幅を決めて
+  読み込みのたびに呼ばれ、`keyboard_area.window()` の幅と高さから折り返し幅（横長なら幅の 75 %）を決めて
   `tabbed_keycodes.set_wrap_width()` に渡す。
 - `AlternativeDisplay.available_width()` はスクロール領域の幅と `wrap_width` の小さい方。ブロックの配置は
   従来どおり中央（左右の stretch）で、ブロックの中身は左詰め。
 - ディスプレイキーボード付きのタブ（Basic / ISO/JIS / Quantum）は `select_alternative()` で
   「`wrap_width` に収まる最も広い代替表示」を選ぶ。どれも収まらなければキーボード無しの一覧（折り返し）。
+- **2026-09-23 変更**: ブロックの幅は「キーボード型の並びの幅」ではなく「利用できる幅（横長では
+  ウィンドウ幅の 75 %、縦長では画面幅）」を上限とする。並びの幅と 1 行に並べたボタンの幅の大きい方を、
+  この上限で切った値がブロック幅。Quantum のように並びが狭くてもその下のボタンは折り返し幅まで使い、
+  並びはブロック内で左寄せ。ブロックは従来どおり中央配置（`test_keymap_split.py::
+  test_keyboard_tab_block_is_wrap_width_not_keyboard_width`）。
 - トレイ（他タブで出るピッカー）は従来どおり画面幅を使う。
 
 ## 4.7 レイヤーボタンの位置（2026-09-22 追加）
@@ -177,6 +183,20 @@ flowchart LR
     B -- はい --> D[左スペーサーを固定幅にして列をタブ左端へ<br/>隙間 += 移動量、キーボードは据え置き]
 ```
 
+## 4.8 エントリカードの幅（2026-09-23 追加）
+
+Tap Dance / HostOS / Combos のカード（`EntryCard`、`EntryCardContainer`）は、自然な大きさ（正方形）で
+1 行に入る枚数 n を求め、n 枚が行の幅をちょうど埋めるように各カードの幅を等しく広げる（高さは自然な
+値のまま）。右端に空きの帯が残らない。ウィンドウのリサイズ（縦スクロールバーの出入りを含む）のたびに
+再計算する（`EntryCardContainer.fit_cards`）。
+
+```mermaid
+flowchart LR
+    A[表示幅 avail] --> B["n = (avail + gap) // (side + gap)"]
+    B --> C["幅 = (avail - (n-1)·gap) // n"]
+    C --> D[全カードに setFixedWidth]
+```
+
 ## 4.6 エディタタブの配置（2026-09-22 追加）
 
 上段のエディタタブ（Keymap / Macros / …）と下段のピッカーのタブ（Basic / ISO/JIS / …）に加え、Macros /
@@ -192,7 +212,7 @@ Key Override / Alt Repeat Key / QMK Settings の中にあるタブバーも中�
 文字が切れないよう、ピッカーのボタンはスタイルシートの内側余白を 0 にし、`frame_extra`（線幅 3px）の分だけ正方形を広げる。
 キーの一辺は `KEYCODE_BTN_RATIO` × フォント高で、upstream の 3 から **3.4** に上げて少し大きくする。
 
-**配置**: 各タブの中身（キーボード型の並び `DisplayKeyboard` と、その下の折り返しボタン列）は 1 つのブロック `AlternativeDisplay.block` に入れる。ブロック内は**左寄せ**、ブロックの幅はキーボード型の並びの幅に合わせてブロック自体を**中央**に置く。並びが無いタブ（Layers、Backlight、App/Media/Mouse、User、Macro、Tap Dance、HostOS）は、ブロックの幅を **min(ページ幅, 全ボタンを 1 行に並べた幅)** にして中央に置く（`AlternativeDisplay.resizeEvent` で再計算）。1 行に収まらないときは全幅で左から折り返す。
+**配置**: 各タブの中身（キーボード型の並び `DisplayKeyboard` と、その下の折り返しボタン列）は 1 つのブロック `AlternativeDisplay.block` に入れる。ブロック内は**左寄せ**、ブロックの幅は §4.5 の利用できる幅を上限に（2026-09-23 までは並びの幅に）合わせてブロック自体を**中央**に置く。並びが無いタブ（Layers、Backlight、App/Media/Mouse、User、Macro、Tap Dance、HostOS）は、ブロックの幅を **min(ページ幅, 全ボタンを 1 行に並べた幅)** にして中央に置く（`AlternativeDisplay.resizeEvent` で再計算）。1 行に収まらないときは全幅で左から折り返す。折り返すとき、カード型のボタン（Tap Dance / HostOS / Macro の `EntryCardButton`）は §4.8 の編集側カードと同じ計算で幅を均等に広げ、各行がブロック幅を埋めるようにする（`AlternativeDisplay.fit_card_buttons`、2026-09-23 追加）。1 行に収まるときは自然な幅のまま。カード型のタブも §4.5 の折り返し幅の中に収める（ブロック幅は変えず、その中の行を埋める）。
 
 ## 5. テスト
 
@@ -216,6 +236,7 @@ Key Override / Alt Repeat Key / QMK Settings の中にあるタブバーも中�
 | `test_keymap_split.py::test_layer_buttons_one_key_left_of_keyboard`（GUI） | レイヤーボタン列の右端とキーボード左端の間隔が 1 キー幅（±3px）で、まとまりが左端に寄っていない |
 | `test_keymap_split.py::test_layer_buttons_align_with_tab_bar`（GUI） | 案内位置が中央配置より左ならボタン列左端が案内位置に揃い、キーボードは動かない。右なら中央配置のまま |
 | `test_keymap_split.py::test_layer_button_guide_is_editor_tab_bar`（GUI） | 案内位置がエディタタブバー先頭タブの左端（グローバル x） |
+| `test_entry_cards.py`（GUI） | 1 行のカードが表示幅をちょうど埋め、全カード同じ幅、高さは自然な値。リサイズで枚数と幅が追従。ピッカーのカード型ボタンも折り返し時に行を埋め、1 行に収まる幅では自然な幅に戻る |
 | `test_theme.py::test_editor_tabs_centred`（GUI） | エディタタブとピッカータブのタブバーの中心が、それぞれのタブウィジェットの中心と一致（±5%） |
 | `test_theme.py::test_checkbox_check_mark`（GUI） | チェック済みインジケータのスタイルに `check.svg` の `image: url(...)` があり、描画結果ではチェック時だけ緑の中に白い画素がある |
 | `test_theme.py::test_device_combobox_size`（GUI） | キーボード選択ドロップダウンのフォントがアプリ既定 + 4pt、高さが既定の 1.4 倍 |

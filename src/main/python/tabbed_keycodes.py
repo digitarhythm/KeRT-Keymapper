@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout, QHBoxLayout, QSizePolicy
+from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout, QHBoxLayout, QSizePolicy, \
+    QWIDGETSIZE_MAX
 from PyQt5.QtGui import QPalette
 
 from constants import KEYCODE_BTN_RATIO, PICKER_FONT_DELTA
@@ -67,18 +68,48 @@ class AlternativeDisplay(QWidget):
         layout.addStretch(1)
         self.setLayout(layout)
 
+    def button_gap(self, w):
+        """Horizontal distance FlowLayout puts between two buttons"""
+        return self.key_layout.spacing() + w.style().layoutSpacing(QSizePolicy.PushButton, QSizePolicy.PushButton,
+                                                                   Qt.Horizontal)
+
     def flow_row_width(self):
-        """Width the flow layout would need to put every button on one row"""
+        """Width the flow layout would need to put every button on one row, at the buttons' natural
+        widths (w.sizeHint(): not clamped by a width set in fit_card_buttons)"""
         width = 0
         for i in range(self.key_layout.count()):
             item = self.key_layout.itemAt(i)
             w = item.widget()
             if w is None or w.isHidden():
                 continue
-            spacing = self.key_layout.spacing() + w.style().layoutSpacing(
-                QSizePolicy.PushButton, QSizePolicy.PushButton, Qt.Horizontal)
-            width += item.sizeHint().width() + spacing
+            width += w.sizeHint().width() + self.button_gap(w)
         return width
+
+    def card_buttons(self):
+        return [b for b in self.buttons if isinstance(b, EntryCardButton) and not b.isHidden()]
+
+    def fit_card_buttons(self, block_width, wrapping):
+        """Tap Dance / HostOS / Macro cards: when they wrap, widen them equally so that every full row
+        spans the block (as the editors' cards do); otherwise they keep their natural width"""
+        cards = self.card_buttons()
+        if not cards:
+            return
+        if not wrapping:
+            for b in cards:
+                if b.maximumWidth() != QWIDGETSIZE_MAX:
+                    b.setMinimumWidth(0)
+                    b.setMaximumWidth(QWIDGETSIZE_MAX)
+            return
+        # FlowLayout keeps a button on the row while its right edge is <= rect.right()
+        gap = self.button_gap(cards[0])
+        row = block_width - 1
+        side = max(b.sizeHint().width() for b in cards)
+        n = max(1, (row + gap) // (side + gap))
+        width = max(side, (row - (n - 1) * gap) // n)
+        for b in cards:
+            if b.maximumWidth() != width or b.minimumWidth() != width:
+                b.setFixedWidth(width)
+        self.key_layout.invalidate()
 
     def available_width(self):
         """Width of the enclosing scroll area's viewport (the tab page). Our own width is not usable
@@ -98,13 +129,17 @@ class AlternativeDisplay(QWidget):
         self.update_block_width()
 
     def update_block_width(self):
-        """Keyboard tabs: as wide as the display keyboard. Other tabs: as wide as one row of buttons,
-        or the full width when they need to wrap. Either way the block is centred and its contents
-        are left-aligned."""
+        """The block is as wide as its contents want (the display keyboard, or one row of buttons),
+        capped at the available width: the wrap width (window height in landscape windows) or the
+        page width. So a keyboard tab's buttons wrap at the wrap width, not at the (possibly narrow)
+        display keyboard. Either way the block is centred and its contents are left-aligned."""
+        natural = max(self.flow_row_width(), 1)
         if self.kb_display:
-            width = self.kb_display.sizeHint().width()
-        else:
-            width = min(self.available_width(), max(self.flow_row_width(), 1))
+            natural = max(natural, self.kb_display.sizeHint().width())
+        available = self.available_width()
+        width = min(available, natural)
+        if not self.kb_display:
+            self.fit_card_buttons(width, natural > available)
         if width > 0 and self.block.width() != width:
             self.block.setFixedWidth(width)
 

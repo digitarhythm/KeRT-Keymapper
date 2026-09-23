@@ -95,7 +95,9 @@ def landscape(qtbot, width=1600, height=900):
 
 def test_picker_wraps_in_landscape(qtbot):
     mw, ke = landscape(qtbot)
-    wrap = mw.height()
+    from editor.keymap_editor import picker_wrap_width, PICKER_WRAP_RATIO
+    assert PICKER_WRAP_RATIO == 0.75
+    wrap = picker_wrap_width(mw.width())
     assert ke.tabbed_keycodes.wrap_width == wrap
     ak = ke.tabbed_keycodes.all_keycodes
     assert ak.width() > wrap + 50, "the picker must be wider than the wrap width for the test to mean anything"
@@ -117,6 +119,25 @@ def test_picker_wraps_in_landscape(qtbot):
     assert abs(alt.block.geometry().left() - (alt.width() - alt.block.width()) // 2) <= 2
 
 
+def test_keyboard_tab_block_is_wrap_width_not_keyboard_width(qtbot):
+    """A tab with a display keyboard (Quantum: the narrow modifier layout) still wraps its buttons at
+    the wrap width, so the display keyboard's width is not the limit (2026-09-23)"""
+    from editor.keymap_editor import picker_wrap_width
+
+    mw, ke = landscape(qtbot)
+    wrap = picker_wrap_width(mw.width())
+    ak = ke.tabbed_keycodes.all_keycodes
+    quantum = picker_tab(ak, "Quantum")
+    alt = visible_alternative(quantum)
+    qtbot.waitUntil(lambda: alt.block.width() > 0)
+    assert alt.kb_display is not None and alt.required_width() < wrap - 100, "the modifier layout is narrower"
+    assert alt.flow_row_width() > wrap, "the Quantum buttons need more than one row"
+    qtbot.waitUntil(lambda: abs(alt.block.width() - wrap) <= 2)
+    assert abs(alt.block.geometry().left() - (alt.width() - alt.block.width()) // 2) <= 2
+    # the display keyboard stays left-aligned inside the block
+    assert alt.kb_display.geometry().left() <= 2
+
+
 def test_picker_full_width_in_portrait(qtbot):
     mw, ke = prepared(qtbot, 800, 1100)
     qtbot.waitUntil(lambda: mw.height() > mw.width())
@@ -132,14 +153,16 @@ def test_picker_full_width_in_portrait(qtbot):
 
 
 def test_picker_wrap_follows_resize(qtbot):
+    from editor.keymap_editor import picker_wrap_width
+
     mw, ke = landscape(qtbot)
-    assert ke.tabbed_keycodes.wrap_width == mw.height()
+    assert ke.tabbed_keycodes.wrap_width == picker_wrap_width(mw.width())
     mw.resize(800, 1100)
     qtbot.waitUntil(lambda: mw.height() > mw.width())
     qtbot.waitUntil(lambda: ke.tabbed_keycodes.wrap_width is None)
     mw.resize(1600, 900)
     qtbot.waitUntil(lambda: mw.width() > mw.height())
-    qtbot.waitUntil(lambda: ke.tabbed_keycodes.wrap_width == mw.height())
+    qtbot.waitUntil(lambda: ke.tabbed_keycodes.wrap_width == picker_wrap_width(mw.width()))
 
 
 def test_layer_buttons_one_key_left_of_keyboard(qtbot):

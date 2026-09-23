@@ -31,7 +31,7 @@ from editor.tap_dance import TapDance
 from editor.host_os import HostOS
 from unlocker import Unlocker
 from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
-from vial_device import VialKeyboard
+from vial_device import VialKeyboard, DeviceOpenError
 from editor.matrix_test import MatrixTest
 
 import themes
@@ -345,6 +345,14 @@ class MainWindow(QMainWindow):
     def on_click_refresh(self):
         self.autorefresh.update(quiet=False, hard=True)
 
+    def deselect_device(self):
+        """No keyboard selected: close whatever is open and clear the selector without re-entering
+        on_device_selected"""
+        self.combobox_devices.blockSignals(True)
+        self.combobox_devices.setCurrentIndex(-1)
+        self.combobox_devices.blockSignals(False)
+        self.autorefresh.select_device(-1)
+
     def on_devices_updated(self, devices, hard_refresh):
         self.combobox_devices.blockSignals(True)
 
@@ -372,6 +380,13 @@ class MainWindow(QMainWindow):
         except ProtocolError:
             QMessageBox.warning(self, "", tr("MainWindow", "Unsupported protocol version!\n"
                                                            "Please download latest Vial from https://get.vial.today/"))
+        except DeviceOpenError:
+            # another program (the browser version, another copy of this app, Vial) holds the keyboard
+            self.deselect_device()
+            QMessageBox.warning(self, "", tr("MainWindow", "Could not open the keyboard.\n"
+                                                           "Check that no other program (the browser version, another copy of "
+                                                           "KeRT-Keymapper, Vial) is using it, then select it again."))
+            return
 
         if isinstance(self.autorefresh.current_device, VialKeyboard):
             keyboard_id = self.autorefresh.current_device.keyboard.keyboard_id

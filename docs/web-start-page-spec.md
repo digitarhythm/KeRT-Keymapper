@@ -83,6 +83,16 @@ flowchart TD
 ローカル確認: `KERT_NO_ISOLATION=1 python3 web/dev_server.py` でヘッダーなしの配信になり、Pages での
 強制再読み込みと同じ状態を再現できる。
 
+### 3.y ローカルプレビューではキャッシュしない（2026-09-23 追加）
+
+サービスワーカーはハッシュ付きのビルドファイル（`main-<hash>.js/.wasm/.data/.worker.js`）をキャッシュ優先で
+返す。ハッシュは git のコミットなので、GitHub Pages ではコミットごとに変わり問題ない。しかしローカルプレビュー
+（`web/dev_server.py`、`localhost:8765`）では同じコミットのまま何度も再リンクするためハッシュが変わらず、
+古い `.js` と新しい `.wasm` の組み合わせが返されて `Cannot read properties of undefined (reading 'apply')`
+や worker のエラーになっていた。対策: サービスワーカーは `localhost` / `127.0.0.1` / `[::1]` ではキャッシュを
+使わず（ヘッダー付与だけ行う）、有効化時に既存キャッシュをすべて消す。キャッシュ名も `v3` に上げ、Pages 側でも
+混在した古いエントリを捨てる。`window.onerror` は worker からの `ErrorEvent` をテキストにして表示する。
+
 ## 4. 国際化
 
 ページの文言は `index.html` 内の辞書 `STRINGS = {ja: {...}, en: {...}}` から、`navigator.language` が

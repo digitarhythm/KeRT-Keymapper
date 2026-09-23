@@ -299,7 +299,8 @@ def test_header_margin(qtbot):
 
 
 def test_picker_block_centered(qtbot):
-    """ Picker tab contents are left-aligned inside a block that is as wide as the display keyboard and centred """
+    """ Picker tab contents are left-aligned inside a centred block; the block is capped at the available
+    width (§4.5) and at least as wide as the display keyboard (2026-09-23: it used to be exactly that wide) """
     from widgets.square_button import SquareButton
     from test_gui import prepare, FAKE_KEYBOARD
 
@@ -316,8 +317,9 @@ def test_picker_block_centered(qtbot):
 
     block, kb = alt.block, alt.kb_display
     gx = lambda w, p: w.mapToGlobal(p).x()
-    # block width follows the display keyboard
-    assert abs(block.width() - kb.width()) <= 6
+    # block: at least the display keyboard, at most the available width; the keyboard sits at its left
+    assert kb.width() - 6 <= block.width() <= alt.available_width()
+    assert abs(gx(kb, kb.rect().topLeft()) - gx(block, block.rect().topLeft())) <= 6
     # block is centred in the tab page
     page_centre = gx(alt, alt.rect().center())
     block_centre = gx(block, block.rect().center())

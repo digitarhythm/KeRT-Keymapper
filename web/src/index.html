@@ -657,6 +657,8 @@ body {
     }
 
     window.onerror = function(message, source, lineno, colno, error) {
+        // a worker's error arrives as an ErrorEvent object: show its text, not "[object ErrorEvent]"
+        if (message && typeof message === "object") message = message.message || String(message);
         alert(message);
     };
 

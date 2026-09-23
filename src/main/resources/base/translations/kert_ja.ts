@@ -32,6 +32,12 @@ Please change your keyboard UID to be unique before you ship!</source>
 配布前にキーボード UID を固有の値に変更してください。</translation>
     </message>
     <message>
+        <source>Could not open the keyboard.
+Check that no other program (the browser version, another copy of KeRT-Keymapper, Vial) is using it, then select it again.</source>
+        <translation>キーボードを開けませんでした。
+他のプログラム（ブラウザ版、別に起動した KeRT-Keymapper、Vial など）がキーボードを使っていないか確認して、もう一度選択してください。</translation>
+    </message>
+    <message>
         <source>No devices detected. Connect a Vial-compatible device and press &quot;Refresh&quot;&lt;br&gt;or select &quot;File&quot; → &quot;Download VIA definitions&quot; in order to enable support for VIA keyboards.</source>
         <translation>デバイスが見つかりません。Vial 対応デバイスを接続して「更新」を押すか、&lt;br&gt;「ファイル」→「VIA 定義をダウンロード」を選ぶと VIA キーボードにも対応できます。</translation>
     </message>

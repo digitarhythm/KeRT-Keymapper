@@ -19,6 +19,12 @@ from constants import KEY_SIZE_RATIO
 SPLIT_RATIO = (4, 6)
 # auto-fit never enlarges the keys beyond this (tiny macro pads would otherwise fill the screen)
 MAX_FIT_SCALE = 3.0
+# landscape windows: the picker wraps at this share of the window width (§4.5, 2026-09-23: was the window height)
+PICKER_WRAP_RATIO = 0.75
+
+
+def picker_wrap_width(window_width):
+    return int(window_width * PICKER_WRAP_RATIO)
 
 
 class RatioSplitter(QSplitter):
@@ -190,11 +196,11 @@ class KeymapEditor(BasicEditor):
         return width, inner.height()
 
     def update_picker_wrap(self):
-        """Picker wrap width from the window's aspect: landscape windows wrap the picker at a width equal to
-        the window height (block centred, contents left-aligned), portrait windows use the full width (§4.5)"""
+        """Picker wrap width from the window's aspect: landscape windows wrap the picker at 75 % of the
+        window width (block centred, contents left-aligned), portrait windows use the full width (§4.5)"""
         win = self.keyboard_area.window()
         width, height = win.width(), win.height()
-        self.tabbed_keycodes.set_wrap_width(None if height > width else height)
+        self.tabbed_keycodes.set_wrap_width(None if height > width else picker_wrap_width(width))
 
     def key_width_px(self, scale=None):
         """Width of one key on the keymap at the given (default: current) scale"""
