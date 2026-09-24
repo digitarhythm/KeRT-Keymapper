@@ -82,3 +82,12 @@ def test_error_alert_shows_worker_error_text():
     html = page()
     handler = html[html.index("window.onerror = function"):html.index("};", html.index("window.onerror = function"))]
     assert "message.message" in handler
+
+
+def test_undefined_keyboard_name_on_the_web_page():
+    """The start page names a keyboard without a product name "Undefined Keyboard" (list and app)"""
+    html = page()
+    assert 'var UNDEFINED_KEYBOARD_NAME = "Undefined Keyboard";' in html
+    fn = html[html.index("function device_name"):html.index("}", html.index("function device_name"))]
+    assert "UNDEFINED_KEYBOARD_NAME" in fn and "toString(16)" not in fn
+    assert "product_string: device_name(g_device)," in html

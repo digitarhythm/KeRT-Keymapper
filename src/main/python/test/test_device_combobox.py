@@ -119,3 +119,25 @@ def test_popup_delegate(qtbot):
     assert isinstance(delegate, DeviceItemDelegate)
     hint = delegate.sizeHint(QStyleOptionViewItem(), cb.model().index(0, 0))
     assert hint.height() >= QFontMetrics(cb.owner_font()).height() + QFontMetrics(cb.name_font()).height()
+
+
+def test_undefined_keyboard_name():
+    """A device without a product name (RMK over Bluetooth reports none) is called "Undefined Keyboard" """
+    from vial_device import VialKeyboard as VialDevice, UNDEFINED_KEYBOARD_NAME
+    from widgets.device_combobox import split_title
+
+    assert UNDEFINED_KEYBOARD_NAME == "Undefined Keyboard"
+    ids = {"path": "/x", "vendor_id": 0x1209, "product_id": 0xFF09}
+    for desc in ({**ids, "manufacturer_string": "", "product_string": ""},
+                 {**ids, "manufacturer_string": None, "product_string": None},
+                 dict(ids)):
+        dev = VialDevice(desc)
+        assert dev.title() == "Undefined Keyboard"
+        assert split_title(dev) == ("", "Undefined Keyboard")
+    # a manufacturer without a product name keeps the owner line
+    dev = VialDevice({**ids, "manufacturer_string": "Acme", "product_string": None})
+    assert dev.title() == "Acme Undefined Keyboard"
+    assert split_title(dev) == ("Acme", "Undefined Keyboard")
+    # a normal device is unchanged
+    dev = VialDevice({**ids, "manufacturer_string": "Acme", "product_string": "Pro 60"})
+    assert dev.title() == "Acme Pro 60"

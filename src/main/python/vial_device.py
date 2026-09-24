@@ -7,6 +7,11 @@ from protocol.dummy_keyboard import DummyKeyboard
 from util import MSG_LEN, pad_for_vibl
 
 
+# shown when the device reports no product name (e.g. an RMK keyboard connected over Bluetooth); the
+# browser page (web/src/index.html) uses the same text
+UNDEFINED_KEYBOARD_NAME = "Undefined Keyboard"
+
+
 class DeviceOpenError(RuntimeError):
     """The HID device could not be opened (typically another program has it)"""
 
@@ -57,7 +62,9 @@ class VialKeyboard(VialDevice):
         self.keyboard.reload(override_json)
 
     def title(self):
-        s = "{} {}".format(self.desc["manufacturer_string"], self.desc["product_string"]).strip()
+        manufacturer = (self.desc.get("manufacturer_string") or "").strip()
+        product = (self.desc.get("product_string") or "").strip() or UNDEFINED_KEYBOARD_NAME
+        s = "{} {}".format(manufacturer, product).strip()
         if self.sideload:
             s += " [sideload]"
         elif self.via_stack:

@@ -2,5 +2,5 @@
     "app_name": "KeRT-Keymapper",
     "author": "digitarhythm",
     "main_module": "src/main/python/main.py",
-    "version": "1.1.5"
+    "version": "1.1.6"
 }

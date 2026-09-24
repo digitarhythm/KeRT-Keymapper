@@ -528,8 +528,12 @@ body {
     // keyboards this site may already use (permitted earlier, plugged in now); [] = none known yet
     var g_known = [];
 
+    // a keyboard that reports no product name (e.g. RMK over Bluetooth) is shown as "Undefined Keyboard",
+    // the same text the desktop app uses (vial_device.UNDEFINED_KEYBOARD_NAME)
+    var UNDEFINED_KEYBOARD_NAME = "Undefined Keyboard";
+
     function device_name(device) {
-        return (device.productName || "").trim() || device.vendorId.toString(16) + ":" + device.productId.toString(16);
+        return (device.productName || "").trim() || UNDEFINED_KEYBOARD_NAME;
     }
 
     // one clickable name box per known keyboard, stacked; clicking a box connects to that keyboard
@@ -631,7 +635,7 @@ body {
             serial_number: "",
             release_number: 1,
             manufacturer_string: "",
-            product_string: g_device.productName,
+            product_string: device_name(g_device),
             usage_page: 65376,
             usage: 97,
             interface_number: 1
