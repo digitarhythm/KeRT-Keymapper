@@ -446,8 +446,9 @@ class KeyboardWidget(QWidget):
 
             active = key.active or (self.active_key == key and not self.active_mask)
 
-            # draw keycap background/drop-shadow (or the whole flat key)
-            qp.setPen(active_pen if active else inactive_pen)
+            # draw keycap background/drop-shadow (or the whole flat key); a selected flat key keeps its dark
+            # outline, only the fill shows the (light grey) highlight
+            qp.setPen(active_pen if active and not key_style.FLAT_KEYS else inactive_pen)
             brush = background_brush
             if key.pressed:
                 brush = background_pressed_brush

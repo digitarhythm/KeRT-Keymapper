@@ -27,8 +27,8 @@ BRAND_THEMES = [
         QPalette.Mid: "#303030",              # key outline, widget borders
         QPalette.BrightText: "#d1242f",
         QPalette.Link: "#0969da",
-        QPalette.Highlight: "#00a3a3",        # brand colour (selection / pressed), provisional
-        QPalette.HighlightedText: "#ffffff",
+        QPalette.Highlight: "#cccccc",        # selection / pressed: light grey (2026-09-27, was KeRT green #00a3a3)
+        QPalette.HighlightedText: "#1f2328",  # dark text on the light grey
         (QPalette.Active, QPalette.Button): "#ffffff",
         (QPalette.Disabled, QPalette.ButtonText): "#9aa0a6",
         (QPalette.Disabled, QPalette.WindowText): "#9aa0a6",
@@ -102,11 +102,11 @@ def stylesheet(name):
         SquareButton {{
             padding: 0px;
         }}
+        /* highlighted: light grey fill, the dark outline stays (a grey box without it reads as disabled) */
         QPushButton:pressed, QToolButton:pressed, EntryCardButton:pressed,
         QPushButton:checked, QToolButton:checked {{
             background-color: {hl};
             color: {hlt};
-            border-color: {hl};
         }}
         QTabWidget::tab-bar {{
             alignment: center;   /* every tab bar: editors, picker, and the tabs inside Macros / Key Override / Alt Repeat Key / QMK Settings */
@@ -122,7 +122,6 @@ def stylesheet(name):
         QTabBar::tab:selected {{
             background-color: {hl};
             color: {hlt};
-            border-color: {hl};
         }}
         QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button {{
             border: none;
@@ -135,8 +134,7 @@ def stylesheet(name):
             background-color: {base};
         }}
         QCheckBox::indicator:checked, QGroupBox::indicator:checked {{
-            background-color: {hl};
-            border-color: {hl};{check}
+            background-color: {hl};{check}
         }}
         QCheckBox::indicator:disabled, QGroupBox::indicator:disabled {{
             border-color: {disabled};

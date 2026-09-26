@@ -7,6 +7,12 @@
     <script src="kert-serviceworker.js"></script>
     <link rel="icon" href="icon.png" type="image/png">
 <style>
+/* highlight colours: the same as the app's KeRT Light palette (branding_theme.py, Highlight / HighlightedText) */
+:root {
+    --kert-highlight: #cccccc;
+    --kert-highlight-hover: #dcdcdc;
+    --kert-highlight-text: #1f2328;
+}
 body {
     font-family: sans-serif;
     margin: 0;
@@ -48,7 +54,7 @@ body {
     line-height: 1.6;
     color: #1f2328;
 }
-/* the start button looks like the cards inside the app: 10px corners, 3px #303030 frame, KeRT green */
+/* the start button looks like the cards inside the app: 10px corners, 3px #303030 frame, highlight grey */
 .startup_btn {
     font-size: 140%;
     padding: 0.4em 1.2em;
@@ -56,17 +62,17 @@ body {
     align-items: center;
     gap: 0.6em;
     font-family: inherit;
-    color: #ffffff;
-    background-color: #00a3a3;
+    color: var(--kert-highlight-text);
+    background-color: var(--kert-highlight);
     border: 3px solid #303030;
     border-radius: 10px;
     cursor: pointer;
 }
 .startup_btn:hover:enabled {
-    background-color: #00b8b8;
+    background-color: var(--kert-highlight-hover);
 }
 .startup_btn:disabled {
-    color: #ffffff;
+    color: var(--kert-highlight-text);
     opacity: 0.75;
     cursor: default;
 }
@@ -118,16 +124,16 @@ body {
     cursor: pointer;
 }
 .known_name:hover:enabled {
-    background-color: #e6f7f7;
+    background-color: #eeeeee;
 }
 .known_name:disabled {
     cursor: default;
     opacity: 0.6;
 }
-/* the keyboard being connected: KeRT green (the spinner is the big one over the card, #big_spinner) */
+/* the keyboard being connected: highlight grey (the spinner is the big one over the card, #big_spinner) */
 .known_name.selected, .known_name.selected:disabled {
-    background-color: #00a3a3;
-    color: #ffffff;
+    background-color: var(--kert-highlight);
+    color: var(--kert-highlight-text);
     opacity: 1;
 }
 /* large loading spinner centred over the selection card while a chosen keyboard connects and starts */
@@ -170,7 +176,7 @@ body {
 #progress_fill {
     height: 100%;
     width: 0;
-    background-color: #00a3a3;
+    background-color: var(--kert-highlight);
     transition: width 0.3s ease-out;
 }
 #progress_label {
@@ -183,8 +189,8 @@ body {
     display: none;
     width: 1em;
     height: 1em;
-    border: 3px solid rgba(255, 255, 255, 0.35);
-    border-top-color: #ffffff;
+    border: 3px solid rgba(31, 35, 40, 0.25);
+    border-top-color: var(--kert-highlight-text);
     border-radius: 50%;
     animation: kert-spin 0.8s linear infinite;
 }
@@ -363,7 +369,7 @@ body {
         progress_render();
     }
 
-    // known-keyboard panel while connecting / starting: the chosen box turns green, a big spinner sits
+    // known-keyboard panel while connecting / starting: the chosen box turns grey, a big spinner sits
     // in the middle of the card, the other boxes are disabled and the "another keyboard" button is hidden
     function set_known_status(text, busy) {
         document.querySelectorAll("#known_list .known_name").forEach(function (b) {

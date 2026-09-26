@@ -91,3 +91,27 @@ def test_undefined_keyboard_name_on_the_web_page():
     fn = html[html.index("function device_name"):html.index("}", html.index("function device_name"))]
     assert "UNDEFINED_KEYBOARD_NAME" in fn and "toString(16)" not in fn
     assert "product_string: device_name(g_device)," in html
+
+
+def test_start_page_uses_the_app_highlight():
+    """The start page's buttons, chosen keyboard box and progress bar use the app's light grey highlight
+    and dark text (2026-09-27, were KeRT green with white text); no green is left on the page"""
+    import re
+    from PyQt5.QtGui import QPalette
+    import branding_theme
+
+    html = page()
+    theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
+    root = re.search(r":root\s*\{([^}]*)\}", html)
+    assert root, "colours are defined once in :root"
+    assert "--kert-highlight: %s;" % theme[QPalette.Highlight] in root.group(1)
+    assert "--kert-highlight-text: %s;" % theme[QPalette.HighlightedText] in root.group(1)
+    for green in ("#00a3a3", "#00b8b8", "#e6f7f7"):
+        assert green not in html.lower(), green
+    assert "background-color: var(--kert-highlight)" in css_block(html, ".startup_btn").replace("background-color:", "background-color: ") \
+        or "background-color:var(--kert-highlight)" in css_block(html, ".startup_btn")
+    assert "var(--kert-highlight)" in css_block(html, "#progress_fill")
+    sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1)
+    assert "var(--kert-highlight)" in sel and "var(--kert-highlight-text)" in sel
+    # the small spinner inside the start button is dark now that the button is light
+    assert "#ffffff" not in css_block(html, "#startup_spinner")

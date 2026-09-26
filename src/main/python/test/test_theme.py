@@ -73,10 +73,50 @@ def test_widget_stylesheet(qtbot):
         assert "QComboBox {" in css and "padding-left: 32px" in css.split("QComboBox {")[1].split("}")[0]
         # checkboxes (QMK Settings) are drawn dark, filled with the brand colour when checked
         assert "QCheckBox::indicator" in css and "2px solid #303030" in css
-        assert "QCheckBox::indicator:checked" in css and "background-color: #00a3a3" in css.split("QCheckBox::indicator:checked")[1]
+        hl = dict(branding_theme.BRAND_THEMES)["KeRT Light"][QPalette.Highlight]
+        assert "QCheckBox::indicator:checked" in css and "background-color: " + hl in css.split("QCheckBox::indicator:checked")[1]
     finally:
         themes.Theme.set_theme("KeRT Light")
 
+
+
+def contrast(a, b):
+    def lum(c):
+        def ch(v):
+            v /= 255
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        return 0.2126 * ch(c.red()) + 0.7152 * ch(c.green()) + 0.0722 * ch(c.blue())
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def test_highlight_light_grey(qtbot):
+    """ The highlight (selected tab, checked layer button, selected key, checked box) is a light grey
+    (2026-09-27, was KeRT green); text and the check mark on it are dark enough to read """
+    import os
+    import branding_theme
+
+    theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
+    hl, hlt = QColor(theme[QPalette.Highlight]), QColor(theme[QPalette.HighlightedText])
+    assert hl.saturation() == 0, "grey, no colour"
+    assert hl.lightness() >= 190, "light"
+    # still visible against the window and the white key bodies
+    assert hl.lightness() <= QColor(theme[QPalette.Window]).lightness() - 30
+    assert contrast(hl, hlt) >= 7
+    svg = open(os.path.join(os.path.dirname(__file__), "../../resources/base/check.svg"), encoding="utf-8").read()
+    stroke = QColor(svg.split('stroke="')[1].split('"')[0])
+    assert contrast(hl, stroke) >= 7, "the check mark reads on the light grey"
+
+    # selected tab / checked button / checked box keep the dark outline: only the fill turns grey
+    import re
+    import themes
+    branding_theme.register()
+    themes.Theme.set_theme("KeRT Light")
+    css = QApplication.instance().styleSheet()
+    for selector in ("QTabBar::tab:selected", "QPushButton:checked", "QCheckBox::indicator:checked"):
+        block = re.search(re.escape(selector) + r"[^{]*\{([^}]*)\}", css).group(1)
+        assert "background-color: " + theme[QPalette.Highlight] in block, selector
+        assert "border-color: " + theme[QPalette.Highlight] not in block, selector
 
 def test_selected_uses_background(qtbot):
     """ The selected tab and a checked (layer) button are filled with the brand colour, not just outlined """
@@ -190,6 +230,10 @@ def test_selected_key_filled(qtbot):
         legend = [QColor(img.pixel(x, y)) for x in range(r.center().x() - 8, r.center().x() + 8)
                   for y in range(r.center().y() - 8, r.center().y() + 8)]
         assert any(c == hlt for c in legend), "legend of the selected key should use HighlightedText"
+        # the dark outline stays on the selected key (a light grey fill without it reads as disabled)
+        mid = pal.color(QPalette.Mid)
+        edge = [QColor(img.pixel(r.center().x(), y)) for y in range(r.top(), r.top() + 6)]
+        assert any(c == mid for c in edge), "selected key keeps the dark outline"
     finally:
         themes.Theme.set_theme("KeRT Light")
 
@@ -366,6 +410,34 @@ def test_logo_image(qtbot):
     assert icon.mapToGlobal(icon.rect().topRight()).x() <= img.mapToGlobal(img.rect().topLeft()).x()
     assert img.mapToGlobal(img.rect().topRight()).x() <= cb.mapToGlobal(cb.rect().topLeft()).x()
 
+
+
+def test_header_images_black_base(qtbot):
+    """ The header keyboard icon follows the black logo (2026-09-27): a black body with the logo's grey
+    (#888888) rim and no KeRT green left; the app ships the current originals from misc/ """
+    import os
+    from collections import Counter
+    from PyQt5.QtGui import QImage
+
+    root = os.path.join(os.path.dirname(__file__), "../../../..")
+    res = os.path.join(root, "src/main/resources/base")
+    for name in ("keyboard-icon.png", "kert-keymapper.png"):
+        with open(os.path.join(root, "misc", name), "rb") as a, open(os.path.join(res, name), "rb") as b:
+            assert a.read() == b.read(), name + ": the shipped copy is not the misc/ original"
+
+    img = QImage(os.path.join(res, "keyboard-icon.png"))
+    assert not img.isNull()
+    opaque = Counter()
+    for y in range(0, img.height(), 2):
+        for x in range(0, img.width(), 2):
+            c = QColor.fromRgba(img.pixel(x, y))
+            if c.alpha() == 255:
+                opaque[c.name()] += 1
+    # only greys: black and the logo's rim colour, nothing green
+    assert all(abs(QColor(n).red() - QColor(n).green()) <= 2 and abs(QColor(n).green() - QColor(n).blue()) <= 2
+               for n in opaque), "no coloured pixels"
+    assert opaque.most_common(1)[0][0] == "#000000"
+    assert opaque["#888888"] > 0
 
 def test_picker_block_full_width_without_keyboard(qtbot):
     """ Tabs without a display keyboard (Layers, Tap Dance, ...) use the whole width and wrap horizontally """

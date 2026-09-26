@@ -27,8 +27,8 @@ flowchart LR
 | WindowText / Text / ButtonText | `#1f2328` | 文字、キーの文字 |
 | Button | `#ffffff` | キー本体 |
 | Mid | `#303030` | キーの輪郭線、全ウィジェットの枠線 |
-| Highlight | `#00a3a3` | 選択枠・押下（ブランドカラー、暫定） |
-| HighlightedText | `#ffffff` | |
+| Highlight | `#cccccc` | 選択中・押下の塗り。明るめのグレー（2026-09-27 変更、それまでは KeRT グリーン `#00a3a3`） |
+| HighlightedText | `#1f2328` | Highlight 上の文字。グレーの上で読めるよう濃色に（2026-09-27 変更、それまでは `#ffffff`） |
 | Link | `#0969da` | 国別キーマップで上書きされたキーの文字色 |
 | Disabled 系 | `#9aa0a6` | |
 
@@ -46,7 +46,7 @@ flowchart LR
 | 上面パス | 影ぶんを内側に寄せた角丸 | **描かない**（空のパス） |
 | 文字の矩形 | 影の分だけ上寄せ | キー全体の中央 |
 | 輪郭 | なし | `QPalette.Mid` の **3px** 線（`key_style.OUTLINE_WIDTH`） |
-| 選択中のキー | Highlight 色の枠 | **背景を Highlight 色、文字を HighlightedText 色**（枠も Highlight）。押下中は Highlight の明色、ON は暗色で従来どおり区別 |
+| 選択中のキー | Highlight 色の枠 | **背景を Highlight 色、文字を HighlightedText 色**。枠は通常のキーと同じ濃色（2026-09-27 変更、それまでは枠も Highlight）。押下中は Highlight の明色、ON は暗色で従来どおり区別 |
 | マスク付きキーの内側 | 下側 65% の角丸矩形 | 同じ領域、角丸は `CORNER_RADIUS × 0.6` |
 
 `FLAT_KEYS = False` にすれば従来描画に戻せる（upstream との差分を切り分けるため）。
@@ -61,9 +61,9 @@ Fusion スタイルでは角丸や線幅を変えられないため、`branding_
 | カード（`EntryCard`、`EntryCardButton`）、`QPushButton`、`QToolButton`、`QComboBox`、`QSpinBox`、`QLineEdit`、`QTabWidget::pane`、`QTabBar::tab`、`QScrollArea`、`QFrame`（カード） | `10px` | `3px solid` `QPalette.Mid` |
 
 - 値は `key_style.CORNER_RADIUS`（10）と `key_style.OUTLINE_WIDTH`（3）を共用し、キーと揃える。
-- チェックボックス（QMK Settings 等）: 標準の薄い描画をやめ、`QCheckBox::indicator` を 18px・枠線 `2px solid #303030`・角丸 4px にし、チェック時は背景を Highlight 色にし、その上に白い「✓」（リソース `check.svg`、18px）を重ねる（2026-09-21 追加。背景色だけではチェック状態が分かりにくいため）。`check.svg` の絶対パスは `main_window.py` が `branding_theme.set_check_image(appctx.get_resource("check.svg"))` で渡し、スタイルシートの `QCheckBox::indicator:checked { image: url(...) }` に入る。パス未設定なら背景色のみ。
+- チェックボックス（QMK Settings 等）: 標準の薄い描画をやめ、`QCheckBox::indicator` を 18px・枠線 `2px solid #303030`・角丸 4px にし、チェック時は背景を Highlight 色にし、その上に「✓」（リソース `check.svg`、18px。2026-09-27 に白から濃色 `#1f2328` に変更）を重ねる（2026-09-21 追加。背景色だけではチェック状態が分かりにくいため）。`check.svg` の絶対パスは `main_window.py` が `branding_theme.set_check_image(appctx.get_resource("check.svg"))` で渡し、スタイルシートの `QCheckBox::indicator:checked { image: url(...) }` に入る。パス未設定なら背景色のみ。
 - スタイルシートは `KeRT Light` 選択時だけ当て、他のテーマでは空にする（upstream テーマの見た目を変えない）。
-- **選択中の表示**: 選択中のタブ（`QTabBar::tab:selected`）と押し込まれたボタン（`QPushButton:checked` = レイヤーボタン）は枠ではなく**背景を Highlight 色**、文字を HighlightedText 色にする。キーマップ上の選択キーもフラット描画では背景を Highlight 色にする（押下 / ON は明暗で区別）。
+- **選択中の表示**: 選択中のタブ（`QTabBar::tab:selected`）と押し込まれたボタン（`QPushButton:checked` = レイヤーボタン）は枠ではなく**背景を Highlight 色**、文字を HighlightedText 色にする。キーマップ上の選択キーもフラット描画では背景を Highlight 色にする（押下 / ON は明暗で区別）。**枠線は選択中も通常と同じ濃色 `#303030` のまま**にし、塗りだけで選択を示す（2026-09-27。明るいグレーの塗りで枠までグレーにすると輪郭が消えて無効状態のように見えるため。チェックボックスも同じ）。
 - **間隔**: 部品どうしの間隔と余白を線幅と同じ **3px** にする。Qt のレイアウト既定値は `QProxyStyle`（`branding_theme.BrandStyle`）の`pixelMetric` で `PM_Layout*Margin` / `PM_Layout*Spacing` を 3 にして与え、カードや FlowLayout の明示値も 3 に揃える。
 
 ## 4.2 キーボード選択ドロップダウン
@@ -72,6 +72,14 @@ Fusion スタイルでは角丸や線幅を変えられないため、`branding_
 ヘッダー行の並びは **キーボードアイコン `lbl_select_keyboard`（`keyboard-icon.png`）→ ロゴ画像 `lbl_logo_image` → ドロップダウン → Refresh**。アイコンとロゴはドロップダウンの高さに合わせて縮小する。
 ドロップダウン内側のキーボード名の左余白は 32px（スタイルシートの `QComboBox { padding-left: 32px; }`）。ドロップダウンの幅は**一番長いキーボード名が収まる幅**（`QComboBox.AdjustToContents`、更新のたびに再計算）。そのすぐ右に Refresh ボタンを置く。ボタンはドロップダウンと同じフォント（既定 +4pt）で、高さはドロップダウンと同じ、幅は文字に合わせる（横長で可）。文字ロゴは置かない。アイコンとロゴは左詰め、ドロップダウンと Refresh は右詰め（間に stretch）。ヘッダー行の内側には `HEADER_MARGIN` = 6px の余白を取る（全体の 3px より広い）。
 行の左端にはロゴ画像 `lbl_logo_image`（`src/main/resources/base/kert-keymapper.png`、`misc/kert-keymapper.png` が原本。`appctx.get_resource()` で解決し、ドロップダウンの高さに合わせて縦横比を保って縮小）を置く。
+
+**配色（2026-09-27 変更）**: ロゴが黒ベース（塗り `#000000`、縁取り `#888888`）に作り直されたのに合わせ、
+キーボードアイコン `keyboard-icon.png` も KeRT グリーン（`#00a3a3`）から黒ベースに変更した。形はそのままで、
+枠とキーを黒、外周（枠の外側の輪郭）にだけロゴと同じ灰色の縁取りを付ける。縁取りの太さは表示サイズで
+ロゴと揃うよう 19px（ロゴは高さ 309px に対し 18px、アイコンは高さ 320px で、どちらもドロップダウンの高さに
+縮小される）。キー 1 つずつに縁取りを付けるとキーの隙間が埋まるため、外周だけにしている。縁取りの分だけ
+画像を左右に 10px 広げ、500×320 とした。原本は `misc/keyboard-icon.png`、アプリが使うのは
+`src/main/resources/base/` の同名ファイル（中身は同一）。
 
 ## 4.2.1 ドロップダウンの 2 段表示（2026-09-21 追加）
 
@@ -225,6 +233,8 @@ Key Override / Alt Repeat Key / QMK Settings の中にあるタブバーも中�
 | `test_theme.py::test_default_theme_resolution` | 保存値なし / upstream テーマ名 → `KeRT Light`、`KeRT Light` / `System` → そのまま |
 | `test_theme.py::test_widget_stylesheet`（GUI） | `KeRT Light` 適用時にアプリのスタイルシートが `border-radius: 10px` と `3px solid` を含み、他テーマでは空 |
 | `test_theme.py::test_selected_uses_background`（GUI） | スタイルシートで選択タブと checked ボタンの背景が Highlight 色になる |
+| `test_theme.py::test_highlight_light_grey` | Highlight が無彩色の明るいグレー、背景と見分けられる濃さ、文字とチェックマークとのコントラスト比 7 以上。選択タブ・checked ボタン・チェック済みボックスは枠を Highlight 色にしない |
+| `test_theme.py::test_selected_key_filled`（GUI） | 選択キーの塗りが Highlight、文字が HighlightedText、枠は濃色（Mid）のまま |
 | `test_theme.py::test_layout_spacing`（GUI） | `KeRT Light` 適用時に `style().pixelMetric()` の余白・間隔が 3、他テーマでは Fusion の既定値 |
 | `test_theme.py::test_selected_key_filled`（GUI） | 選択中のキーの内側が Highlight 色、刻印が HighlightedText 色で描かれる |
 | `test_keymap_split.py::test_top_bottom_split`（GUI） | 上下が `RatioSplitter` で 4:6、リサイズ後も 4:6 |
@@ -252,6 +262,7 @@ Key Override / Alt Repeat Key / QMK Settings の中にあるタブバーも中�
 | `test_theme.py::test_no_text_logo`（GUI） | 文字ロゴ `lbl_logo` は存在しない |
 | `test_theme.py::test_header_margin`（GUI） | ヘッダー行のレイアウト余白が四辺とも 6px |
 | `test_theme.py::test_logo_image`（GUI） | ロゴ画像が読み込まれ、高さがドロップダウンと同じ、アイコンとドロップダウンの間にある |
+| `test_theme.py::test_header_images_black_base` | アイコンの不透明画素が無彩色のみ（緑なし）、最多が黒、灰色 `#888888` の縁取りを含む。アイコンとロゴは `misc/` の原本と同一 |
 | `test_theme.py::test_picker_key_size`（GUI） | ピッカーのキーの一辺 = フォント高 × 3.4 + 線幅 × 2 |
 | `test_theme.py::test_picker_block_full_width_without_keyboard`（GUI） | 1 行に収まらないタブ（Layers）でブロックが全幅、ボタンが横に並ぶ |
 | `test_theme.py::test_picker_block_centered_without_keyboard`（GUI） | 1 行に収まるタブ（User）でブロックが内容幅・中央、先頭ボタンがブロック左端 |
