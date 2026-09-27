@@ -181,8 +181,25 @@ static PyObject* vialglue_progress(PyObject *self, PyObject *args) {
     return PyLong_FromLong(0);
 }
 
+// tab switch fade, drawn by the page (a CSS-animated box over the page area): Qt paints in software
+// here and cannot crossfade a whole page smoothly (widgets/tab_fade.py)
+static PyObject* vialglue_fade(PyObject *self, PyObject *args) {
+    const char *phase;
+    int x, y, w, h, ms;
+
+    if (!PyArg_ParseTuple(args, "siiiii", &phase, &x, &y, &w, &h, &ms))
+        return NULL;
+
+    EM_ASM({
+        postMessage({cmd: "fade", phase: UTF8ToString($0), x: $1, y: $2, w: $3, h: $4, ms: $5});
+    }, phase, x, y, w, h, ms);
+
+    return PyLong_FromLong(0);
+}
+
 static PyMethodDef VialglueMethods[] = {
     {"progress",  vialglue_progress, METH_VARARGS, ""},
+    {"fade",  vialglue_fade, METH_VARARGS, ""},
     {"write_device",  vialglue_write_device, METH_VARARGS, ""},
     {"read_device",  vialglue_read_device, METH_VARARGS, ""},
     {"unlock_start",  vialglue_unlock_start, METH_VARARGS, ""},

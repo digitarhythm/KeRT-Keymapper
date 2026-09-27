@@ -27,8 +27,9 @@ BRAND_THEMES = [
         QPalette.Mid: "#303030",              # key outline, widget borders
         QPalette.BrightText: "#d1242f",
         QPalette.Link: "#0969da",
-        QPalette.Highlight: "#cccccc",        # selection / pressed: light grey (2026-09-27, was KeRT green #00a3a3)
-        QPalette.HighlightedText: "#1f2328",  # dark text on the light grey
+        QPalette.Highlight: "#767676",        # selection / pressed: mid grey, the lightest grey on which white
+                                              # text still meets WCAG AA 4.5:1 (2026-09-27; #cccccc before, KeRT green #00a3a3 originally)
+        QPalette.HighlightedText: "#ffffff",  # white text on the grey
         (QPalette.Active, QPalette.Button): "#ffffff",
         (QPalette.Disabled, QPalette.ButtonText): "#9aa0a6",
         (QPalette.Disabled, QPalette.WindowText): "#9aa0a6",
@@ -108,6 +109,16 @@ def stylesheet(name):
             background-color: {hl};
             color: {hlt};
         }}
+        /* layer buttons are see-through: the highlight behind them (widgets/layer_highlight.py) slides
+           to the chosen layer; the button over it gets white text through the "lit" property */
+        QPushButton[layerButton="true"], QPushButton[layerButton="true"]:checked,
+        QPushButton[layerButton="true"]:pressed, QPushButton[layerButton="true"]:disabled {{
+            background-color: transparent;
+            color: {text};
+        }}
+        QPushButton[layerButton="true"][lit="true"] {{
+            color: {hlt};
+        }}
         QTabWidget::tab-bar {{
             alignment: center;   /* every tab bar: editors, picker, and the tabs inside Macros / Key Override / Alt Repeat Key / QMK Settings */
         }}
@@ -146,6 +157,7 @@ def stylesheet(name):
         }}
     """.format(w=w, mid=mid, r=r, pl=COMBOBOX_PADDING_LEFT, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
                base=colors[QPalette.Base], disabled=colors[(QPalette.Disabled, QPalette.Text)],
+               text=colors[QPalette.ButtonText],
                check='\n            image: url("{}");'.format(CHECK_IMAGE) if CHECK_IMAGE else "")
 
 

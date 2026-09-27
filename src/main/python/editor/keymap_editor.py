@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal
 
 from any_keycode_dialog import AnyKeycodeDialog
 from editor.basic_editor import BasicEditor
+from widgets.layer_highlight import LayerHighlight
 from widgets.keyboard_widget import KeyboardWidget, EncoderWidget
 from keycodes.keycodes import Keycode
 from widgets.square_button import SquareButton
@@ -119,6 +120,8 @@ class KeymapEditor(BasicEditor):
         w.setLayout(layout)
         w.clicked.connect(self.on_empty_space_clicked)
         self.keyboard_area = w
+        # the highlight box behind the layer buttons, sliding between layers
+        self.layer_highlight = LayerHighlight(w)
         self.row = row
         self.layer_column = layer_column
         self.size_column = size_column
@@ -175,9 +178,11 @@ class KeymapEditor(BasicEditor):
             btn.setRelSize(2.2)
             btn.setWidthFactor(3)   # wide layer buttons
             btn.setCheckable(True)
+            btn.setProperty("layerButton", True)     # see-through: LayerHighlight paints behind it
             btn.clicked.connect(lambda state, idx=x: self.switch_layer(idx))
             self.layout_layers.addWidget(btn)
             self.layer_buttons.append(btn)
+        self.layer_highlight.set_buttons(self.layer_buttons)
         for x in range(0,2):
             btn = SquareButton("-") if x else SquareButton("+")
             btn.setFocusPolicy(Qt.NoFocus)
@@ -341,6 +346,7 @@ class KeymapEditor(BasicEditor):
         for idx, btn in enumerate(self.layer_buttons):
             btn.setEnabled(idx != self.current_layer)
             btn.setChecked(idx == self.current_layer)
+        self.layer_highlight.move_to(self.current_layer)
 
         for widget in self.container.widgets:
             code = self.code_for_widget(widget)

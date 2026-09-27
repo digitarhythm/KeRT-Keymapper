@@ -9,9 +9,10 @@
 <style>
 /* highlight colours: the same as the app's KeRT Light palette (branding_theme.py, Highlight / HighlightedText) */
 :root {
-    --kert-highlight: #cccccc;
-    --kert-highlight-hover: #dcdcdc;
-    --kert-highlight-text: #1f2328;
+    --kert-highlight: #767676;
+    --kert-highlight-hover: #888888;
+    --kert-highlight-text: #ffffff;
+    --kert-window: #f5f6f8;      /* the app's window background (QPalette.Window) */
 }
 body {
     font-family: sans-serif;
@@ -23,6 +24,17 @@ body {
 #canvas {
     width: 100%;
     height: 100%;
+}
+/* tab switch fade (widgets/tab_fade.py asks for it through vialglue.fade): a box in the window colour
+   over the page area, faded in by CSS before the switch and out after it. The browser composites it on
+   the GPU, so it stays smooth however slowly Qt paints (Qt draws in software in this build). */
+#page_fade {
+    position: fixed;
+    display: none;
+    opacity: 0;
+    pointer-events: none;
+    background-color: var(--kert-window);
+    z-index: 10;
 }
 #startup {
     position: fixed;
@@ -189,7 +201,7 @@ body {
     display: none;
     width: 1em;
     height: 1em;
-    border: 3px solid rgba(31, 35, 40, 0.25);
+    border: 3px solid rgba(255, 255, 255, 0.35);
     border-top-color: var(--kert-highlight-text);
     border-radius: 50%;
     animation: kert-spin 0.8s linear infinite;
@@ -269,6 +281,7 @@ body {
 </div>
 
 <canvas id="canvas" oncontextmenu="return false;" tabindex="-1"></canvas>
+<div id="page_fade"></div>
 
 <script>
     // page texts, Japanese when the browser language is Japanese (the app itself follows the same rule)
@@ -391,7 +404,11 @@ body {
 
     var Module = {};
     // UI language: KeRT-Keymapper reads KERT_LANG (branding_i18n.py); take it from the browser
-    Module.preRun = [function () { ENV.KERT_LANG = (navigator.language || "en").replace("-", "_"); }];
+    Module.preRun = [function () {
+        ENV.KERT_LANG = (navigator.language || "en").replace("-", "_");
+        // ?debug=motion: the fades print their timing to the console (widgets/tab_fade.py)
+        if (/[?&]debug=motion\b/.test(location.search)) ENV.KERT_DEBUG_MOTION = "1";
+    }];
     Module.canvas = document.getElementById("canvas");
     Module.qtCanvasElements = [Module.canvas];
 
@@ -418,6 +435,34 @@ body {
     function read_timeout() {
         console.log("device read timed out!");
         _vialglue_set_response_error();
+    }
+
+    // "out": cover the page area, fading the box in; "in": the new page is on the canvas, fade the box away.
+    // Plain timers only: requestAnimationFrame is paused in background tabs, which left the box up.
+    var PAGE_FADE_FAILSAFE_MS = 5000;     // the box goes away even if "in" never comes
+    function page_fade(d) {
+        var box = document.getElementById("page_fade");
+        clearTimeout(page_fade.timer);
+        if (d.phase == "out") {
+            box.style.transition = "none";
+            box.style.left = d.x + "px";
+            box.style.top = d.y + "px";
+            box.style.width = d.w + "px";
+            box.style.height = d.h + "px";
+            box.style.opacity = "0";
+            box.style.display = "block";
+            void box.offsetWidth;               // commit opacity 0 so the transition starts from it
+            box.style.transition = "opacity " + d.ms + "ms ease-in-out";
+            box.style.opacity = "1";
+            page_fade.timer = setTimeout(function () { box.style.display = "none"; }, PAGE_FADE_FAILSAFE_MS);
+        } else {
+            // the canvas is drawn in a worker: give it about two frames to show the new page first
+            page_fade.timer = setTimeout(function () {
+                box.style.transition = "opacity " + d.ms + "ms ease-in-out";
+                box.style.opacity = "0";
+                page_fade.timer = setTimeout(function () { box.style.display = "none"; }, d.ms + 20);
+            }, 32);
+        }
     }
 
     function my_onmessage(e) {
@@ -459,6 +504,8 @@ body {
             saveLayout(e.data.layout);
         } else if (e.data.cmd == "progress") {
             progress_step(e.data.step, e.data.done, e.data.total);
+        } else if (e.data.cmd == "fade") {
+            page_fade(e.data);
         } else if (e.data.cmd == "fatal_error") {
             // shown on the page (no blocking alert); the start controls come back so the user can retry
             set_state("", false);

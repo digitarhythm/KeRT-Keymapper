@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""The KKM app icon follows the grey scheme (2026-09-27): light grey face (the highlight grey), black
+"""The KKM app icon follows the grey scheme (2026-09-27): light grey face (#cccccc), black
 letters with the logo's grey rim, dark frame; no KeRT green in any size (docs/app-icon-spec.md)."""
 import glob
 import os
@@ -47,8 +47,7 @@ def test_ico_is_grey(qtbot):
         assert all(achromatic(n) for n in opaque_colours(img))
 
 
-def test_face_matches_the_highlight(qtbot):
-    from PyQt5.QtGui import QPalette
-    import branding_theme
+def test_face_is_light_grey(qtbot):
+    """ The icon keeps its own light grey face (#cccccc); the app highlight was darkened separately """
     img = QImage(os.path.join(ROOT, "src/main/icons/mac/1024.png"))
-    assert QColor(img.pixel(512, 150)).name() == dict(branding_theme.BRAND_THEMES)["KeRT Light"][QPalette.Highlight]
+    assert QColor(img.pixel(512, 150)).name() == "#cccccc"

@@ -9,7 +9,7 @@
 
 | 部分 | 色 | 由来 |
 |---|---|---|
-| 地 | `#cccccc` | アプリのハイライト（`branding_theme.py` の Highlight） |
+| 地 | `#cccccc` | 作成時のアプリのハイライト色。2026-09-27 にハイライトを `#767676` に暗くしたが、アイコンはこの明るいグレーのまま |
 | 枠 | `#303030` | 画面の枠線と同じ（以前と同じ） |
 | 文字 | `#000000` | ロゴの文字 |
 | 文字の縁取り | `#888888` | ロゴの縁取り |
@@ -37,4 +37,4 @@ PNG 形式の 7 サイズを束ねる。
 |---|---|
 | `test_app_icon.py::test_icon_png_is_grey` | 全 PNG（`src/main/icons/*/`、`web/src/icon.png`）の不透明画素が無彩色のみで、最多色が `#cccccc` |
 | `test_app_icon.py::test_ico_is_grey` | `Icon.ico` の 7 サイズすべてが無彩色 |
-| `test_app_icon.py::test_face_matches_the_highlight` | 地の色がアプリのハイライト色と一致 |
+| `test_app_icon.py::test_face_is_light_grey` | 地の色が `#cccccc` |

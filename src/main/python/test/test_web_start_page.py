@@ -113,5 +113,29 @@ def test_start_page_uses_the_app_highlight():
     assert "var(--kert-highlight)" in css_block(html, "#progress_fill")
     sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1)
     assert "var(--kert-highlight)" in sel and "var(--kert-highlight-text)" in sel
-    # the small spinner inside the start button is dark now that the button is light
-    assert "#ffffff" not in css_block(html, "#startup_spinner")
+    # the small spinner inside the start button uses the highlight text colour (white on the grey)
+    assert "var(--kert-highlight-text)" in css_block(html, "#startup_spinner")
+
+
+def test_page_draws_the_tab_fade():
+    """The browser build's tab fade is a CSS-animated box over the page area (widgets/tab_fade.py asks
+    for it through vialglue.fade): it never takes clicks and sits above the Qt canvas"""
+    html = page()
+    assert '<div id="page_fade"></div>' in html
+    css = css_block(html, "#page_fade")
+    assert "position:fixed" in css and "pointer-events:none" in css and "display:none" in css
+    assert "background-color:var(--kert-window)" in css
+    handler = html[html.index("function my_onmessage"):html.index("const FILE_OPTIONS")]
+    assert 'e.data.cmd == "fade"' in handler and "page_fade(e.data)" in handler
+    fn = html[html.index("function page_fade"):html.index("function my_onmessage")]
+    assert "transition" in fn and "opacity" in fn and "d.ms" in fn
+    # never relies on requestAnimationFrame (paused in background tabs, which left the box up), and a
+    # fail-safe takes the box away if the "in" message never comes
+    assert "requestAnimationFrame" not in fn
+    assert "PAGE_FADE_FAILSAFE_MS" in fn and "var PAGE_FADE_FAILSAFE_MS = 5000;" in html
+
+
+def test_glue_has_fade():
+    c = open(os.path.join(os.path.dirname(PAGE), "main.c"), encoding="utf-8").read()
+    assert '{"fade",  vialglue_fade, METH_VARARGS, ""}' in c
+    assert 'cmd: "fade"' in c

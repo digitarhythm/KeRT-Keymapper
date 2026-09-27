@@ -27,8 +27,8 @@ flowchart LR
 | WindowText / Text / ButtonText | `#1f2328` | 文字、キーの文字 |
 | Button | `#ffffff` | キー本体 |
 | Mid | `#303030` | キーの輪郭線、全ウィジェットの枠線 |
-| Highlight | `#cccccc` | 選択中・押下の塗り。明るめのグレー（2026-09-27 変更、それまでは KeRT グリーン `#00a3a3`） |
-| HighlightedText | `#1f2328` | Highlight 上の文字。グレーの上で読めるよう濃色に（2026-09-27 変更、それまでは `#ffffff`） |
+| Highlight | `#767676` | 選択中・押下の塗り。グレー（2026-09-27 変更。KeRT グリーン `#00a3a3` → `#cccccc` → `#767676`。詳細は `docs/ui-motion-spec.md`） |
+| HighlightedText | `#ffffff` | Highlight 上の文字（白。`#cccccc` の間だけ濃色 `#1f2328` だった） |
 | Link | `#0969da` | 国別キーマップで上書きされたキーの文字色 |
 | Disabled 系 | `#9aa0a6` | |
 
@@ -61,7 +61,7 @@ Fusion スタイルでは角丸や線幅を変えられないため、`branding_
 | カード（`EntryCard`、`EntryCardButton`）、`QPushButton`、`QToolButton`、`QComboBox`、`QSpinBox`、`QLineEdit`、`QTabWidget::pane`、`QTabBar::tab`、`QScrollArea`、`QFrame`（カード） | `10px` | `3px solid` `QPalette.Mid` |
 
 - 値は `key_style.CORNER_RADIUS`（10）と `key_style.OUTLINE_WIDTH`（3）を共用し、キーと揃える。
-- チェックボックス（QMK Settings 等）: 標準の薄い描画をやめ、`QCheckBox::indicator` を 18px・枠線 `2px solid #303030`・角丸 4px にし、チェック時は背景を Highlight 色にし、その上に「✓」（リソース `check.svg`、18px。2026-09-27 に白から濃色 `#1f2328` に変更）を重ねる（2026-09-21 追加。背景色だけではチェック状態が分かりにくいため）。`check.svg` の絶対パスは `main_window.py` が `branding_theme.set_check_image(appctx.get_resource("check.svg"))` で渡し、スタイルシートの `QCheckBox::indicator:checked { image: url(...) }` に入る。パス未設定なら背景色のみ。
+- チェックボックス（QMK Settings 等）: 標準の薄い描画をやめ、`QCheckBox::indicator` を 18px・枠線 `2px solid #303030`・角丸 4px にし、チェック時は背景を Highlight 色にし、その上に白い「✓」（リソース `check.svg`、18px。2026-09-27 に一時的に濃色にしたが、ハイライトを暗くしたので白に戻した）を重ねる（2026-09-21 追加。背景色だけではチェック状態が分かりにくいため）。`check.svg` の絶対パスは `main_window.py` が `branding_theme.set_check_image(appctx.get_resource("check.svg"))` で渡し、スタイルシートの `QCheckBox::indicator:checked { image: url(...) }` に入る。パス未設定なら背景色のみ。
 - スタイルシートは `KeRT Light` 選択時だけ当て、他のテーマでは空にする（upstream テーマの見た目を変えない）。
 - **選択中の表示**: 選択中のタブ（`QTabBar::tab:selected`）と押し込まれたボタン（`QPushButton:checked` = レイヤーボタン）は枠ではなく**背景を Highlight 色**、文字を HighlightedText 色にする。キーマップ上の選択キーもフラット描画では背景を Highlight 色にする（押下 / ON は明暗で区別）。**枠線は選択中も通常と同じ濃色 `#303030` のまま**にし、塗りだけで選択を示す（2026-09-27。明るいグレーの塗りで枠までグレーにすると輪郭が消えて無効状態のように見えるため。チェックボックスも同じ）。
 - **間隔**: 部品どうしの間隔と余白を線幅と同じ **3px** にする。Qt のレイアウト既定値は `QProxyStyle`（`branding_theme.BrandStyle`）の`pixelMetric` で `PM_Layout*Margin` / `PM_Layout*Spacing` を 3 にして与え、カードや FlowLayout の明示値も 3 に揃える。

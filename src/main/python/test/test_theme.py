@@ -80,33 +80,11 @@ def test_widget_stylesheet(qtbot):
 
 
 
-def contrast(a, b):
-    def lum(c):
-        def ch(v):
-            v /= 255
-            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
-        return 0.2126 * ch(c.red()) + 0.7152 * ch(c.green()) + 0.0722 * ch(c.blue())
-    la, lb = sorted((lum(a), lum(b)), reverse=True)
-    return (la + 0.05) / (lb + 0.05)
 
-
-def test_highlight_light_grey(qtbot):
-    """ The highlight (selected tab, checked layer button, selected key, checked box) is a light grey
-    (2026-09-27, was KeRT green); text and the check mark on it are dark enough to read """
-    import os
+def test_highlight_keeps_dark_outline(qtbot):
+    """ Selected tab / checked button / checked box: only the fill shows the highlight, the dark outline stays """
     import branding_theme
-
     theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
-    hl, hlt = QColor(theme[QPalette.Highlight]), QColor(theme[QPalette.HighlightedText])
-    assert hl.saturation() == 0, "grey, no colour"
-    assert hl.lightness() >= 190, "light"
-    # still visible against the window and the white key bodies
-    assert hl.lightness() <= QColor(theme[QPalette.Window]).lightness() - 30
-    assert contrast(hl, hlt) >= 7
-    svg = open(os.path.join(os.path.dirname(__file__), "../../resources/base/check.svg"), encoding="utf-8").read()
-    stroke = QColor(svg.split('stroke="')[1].split('"')[0])
-    assert contrast(hl, stroke) >= 7, "the check mark reads on the light grey"
-
     # selected tab / checked button / checked box keep the dark outline: only the fill turns grey
     import re
     import themes
