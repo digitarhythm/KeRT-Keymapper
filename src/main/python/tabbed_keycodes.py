@@ -35,6 +35,7 @@ class AlternativeDisplay(QWidget):
         if prefix_buttons:
             for title, code in prefix_buttons:
                 btn = SquareButton()
+                btn.make_key()
                 btn.setFontDelta(PICKER_FONT_DELTA)
                 btn.setRelSize(KEYCODE_BTN_RATIO)
                 btn.setText(title)
@@ -161,6 +162,8 @@ class AlternativeDisplay(QWidget):
             # Tap Dance / HostOS entries get a card showing their contents (see entry_labels.py)
             btn = EntryCardButton() if hasattr(keycode, "summary") else SquareButton()
             btn.frame_extra = key_style.OUTLINE_WIDTH
+            if not isinstance(btn, EntryCardButton):
+                btn.make_key()
             btn.setFontDelta(PICKER_FONT_DELTA)
             btn.setRelSize(KEYCODE_BTN_RATIO)
             btn.setToolTip(Keycode.tooltip(keycode.qmk_id))

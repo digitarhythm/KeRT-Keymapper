@@ -1,5 +1,6 @@
 from PyQt5.QtCore import pyqtSignal
 
+import key_style
 from keycodes.keycodes import Keycode
 from any_keycode_dialog import AnyKeycodeDialog
 from widgets.keyboard_widget import KeyboardWidget
@@ -15,7 +16,8 @@ class KeyWidget(KeyboardWidget):
     def __init__(self, keycode_filter=None):
         super().__init__(None)
 
-        self.padding = 1
+        # the dark key look's drop shadow needs room below and around the key
+        self.padding = key_style.SHADOW_OFFSET + key_style.SHADOW_BLUR if key_style.DARK_KEYS else 1
 
         self.keycode = "KC_NO"
         self.set_keycode_filter(keycode_filter)

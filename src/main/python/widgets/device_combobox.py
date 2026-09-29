@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Keyboard selector that shows each device on two lines: the owner (manufacturer) in a half-size font above
 the keyboard name (docs/theme-flat-keys-spec.md §4.2.1)."""
-from PyQt5.QtCore import QRect, QSize, Qt
-from PyQt5.QtGui import QFont, QFontMetrics, QIcon, QPalette
+import key_style
+from PyQt5.QtCore import QRectF, QRect, QSize, Qt
+from PyQt5.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPalette
 from PyQt5.QtWidgets import QComboBox, QStyle, QStyledItemDelegate, QStyleOptionComboBox, QStylePainter
 
 from branding_theme import COMBOBOX_PADDING_LEFT
@@ -125,7 +126,11 @@ class DeviceComboBox(QComboBox):
         return w if w > 0 else ARROW_FALLBACK_WIDTH
 
     def text_area(self):
-        """Where the two lines go: right of the stylesheet's left padding, left of the drop-down arrow."""
+        """Where the two lines go: right of the stylesheet's left padding, left of the drop-down arrow.
+        In the dark key look the face sits inside KEY_MARGINS (room for its shadow), so centre on that."""
+        if key_style.DARK_KEYS:
+            left, top, right, bottom = key_style.KEY_MARGINS
+            return self.rect().adjusted(COMBOBOX_PADDING_LEFT, top, -(self.arrow_width() + right), -bottom)
         return self.rect().adjusted(COMBOBOX_PADDING_LEFT, FRAME, -(self.arrow_width() + FRAME), -FRAME)
 
     def text_layout(self, row):
@@ -143,6 +148,15 @@ class DeviceComboBox(QComboBox):
 
     # --- painting ------------------------------------------------------------------------------------------------
     def paintEvent(self, event):
+        if key_style.DARK_KEYS:
+            # the keys' drop shadow, under the black face the stylesheet draws inside KEY_MARGINS
+            left, top, right, bottom = key_style.KEY_MARGINS
+            face = QRectF(self.rect()).adjusted(left, top, -right, -bottom)
+            r = key_style.KEY_RADIUS
+            shadow = QPainter(self)
+            shadow.setRenderHint(QPainter.Antialiasing)
+            key_style.paint_shadow(shadow, lambda p: p.drawRoundedRect(face, r, r))
+            shadow.end()
         painter = QStylePainter(self)
         opt = QStyleOptionComboBox()
         self.initStyleOption(opt)
@@ -156,5 +170,5 @@ class DeviceComboBox(QComboBox):
         owner, name = self.item_lines(row)
         owner_rect, name_rect = self.text_layout(row)
         group = QPalette.Active if self.isEnabled() else QPalette.Disabled
-        draw_two_lines(painter, owner, name, owner_rect, name_rect, self.owner_font(), self.name_font(),
-                       self.palette().color(group, QPalette.Text))
+        colour = QColor(key_style.KEY_LEGEND) if key_style.DARK_KEYS else self.palette().color(group, QPalette.Text)
+        draw_two_lines(painter, owner, name, owner_rect, name_rect, self.owner_font(), self.name_font(), colour)

@@ -110,9 +110,6 @@ def test_start_page_uses_the_app_highlight():
         assert green not in html.lower(), green
     assert "background-color: var(--kert-highlight)" in css_block(html, ".startup_btn").replace("background-color:", "background-color: ") \
         or "background-color:var(--kert-highlight)" in css_block(html, ".startup_btn")
-    assert "var(--kert-highlight)" in css_block(html, "#progress_fill")
-    sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1)
-    assert "var(--kert-highlight)" in sel and "var(--kert-highlight-text)" in sel
     # the small spinner inside the start button uses the highlight text colour (white on the grey)
     assert "var(--kert-highlight-text)" in css_block(html, "#startup_spinner")
 
@@ -139,3 +136,23 @@ def test_glue_has_fade():
     c = open(os.path.join(os.path.dirname(PAGE), "main.c"), encoding="utf-8").read()
     assert '{"fade",  vialglue_fade, METH_VARARGS, ""}' in c
     assert 'cmd: "fade"' in c
+
+
+
+def test_keyboard_list_white_chosen_black():
+    """The keyboard list on the start page: white boxes with black names; the one clicked turns black
+    with a white name, like the app's keys (2026-09-30)"""
+    import re
+    html = page()
+    box = css_block(html, ".known_name")
+    assert "background-color:#ffffff" in box and "color:#000000" in box
+    sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1).replace(" ", "")
+    assert "background-color:#000000" in sel and "color:#ffffff" in sel and "opacity:1" in sel
+
+
+
+def test_progress_bar_black():
+    """The start-up progress bar fills in black (2026-09-30): the light highlight grey barely showed on
+    the white track"""
+    html = page()
+    assert "background-color:#000000" in css_block(html, "#progress_fill")

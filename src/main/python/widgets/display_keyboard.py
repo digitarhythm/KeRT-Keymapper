@@ -28,6 +28,7 @@ class DisplayKeyboard(QWidget):
             kc = Keycode.find_by_qmk_id(key.labels[0])
             btn = SquareButton()
             btn.frame_extra = key_style.OUTLINE_WIDTH
+            btn.make_key()
             btn.setFontDelta(PICKER_FONT_DELTA)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             btn.setRelSize(KEYCODE_BTN_RATIO)

@@ -82,7 +82,7 @@ class KeyWidget:
             self.polygon = QPolygonF(self.bbox + [self.bbox[0]])
             self.polygon2 = QPolygonF(self.bbox2 + [self.bbox2[0]])
             self.polygon = self.polygon.united(self.polygon2)
-            self.corner = key_style.CORNER_RADIUS if key_style.FLAT_KEYS else self.size * KEY_ROUNDNESS
+            self.corner = key_style.key_corner() if key_style.FLAT_KEYS else self.size * KEY_ROUNDNESS
             if key_style.FLAT_KEYS:
                 self.text_rect = QRect(self.rect)
             self.background_draw_path = self.calculate_background_draw_path()
@@ -434,6 +434,26 @@ class KeyboardWidget(QWidget):
 
         mask_font = qp.font()
         mask_font.setPointSize(round(mask_font.pointSize() * 0.8))
+
+        # dark key look (key_style.DARK_KEYS): black face, white legend, no outline, soft drop shadow
+        dark = key_style.FLAT_KEYS and key_style.DARK_KEYS
+        if dark:
+            regular_pen.setColor(QColor(key_style.KEY_LEGEND))
+            background_brush.setColor(QColor(key_style.KEY_FACE))
+            mask_brush.setColor(QColor(key_style.KEY_MASK_FACE))
+            extra_brush.setColor(QColor(key_style.KEY_LEGEND))
+            inactive_pen = Qt.NoPen
+            # every shadow first, so no key's shadow is drawn over its neighbour
+            for key in self.widgets:
+                qp.save()
+                qp.scale(self.scale, self.scale)
+                qp.translate(key.shift_x, key.shift_y)
+                qp.translate(key.rotation_x, key.rotation_y)
+                qp.rotate(key.rotation_angle)
+                qp.translate(-key.rotation_x, -key.rotation_y)
+                key_style.paint_shadow(qp, lambda p, k=key: p.drawPath(k.background_draw_path),
+                                       unit=1.0 / self.scale if self.scale else 1.0)
+                qp.restore()
 
         for idx, key in enumerate(self.widgets):
             qp.save()

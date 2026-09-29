@@ -4,6 +4,7 @@ import os
 import pathlib
 import sys
 import time
+import key_style
 from logging.handlers import RotatingFileHandler
 
 from PyQt5.QtCore import QCoreApplication, QStandardPaths
@@ -201,11 +202,11 @@ class KeycodeDisplay:
         widget.setMaskText(mask_text)
         widget.setToolTip(tooltip)
         if cls.code_is_overriden(code):
-            widget.setColor(QApplication.palette().color(QPalette.Link))
+            widget.setColor(key_style.override_color())
         else:
             widget.setColor(None)
         if inner and mask and cls.code_is_overriden(inner.qmk_id):
-            widget.setMaskColor(QApplication.palette().color(QPalette.Link))
+            widget.setMaskColor(key_style.override_color())
         else:
             widget.setMaskColor(None)
 
@@ -241,7 +242,7 @@ class KeycodeDisplay:
             if qmk_id in KeycodeDisplay.keymap_override:
                 label = KeycodeDisplay.keymap_override[qmk_id]
                 # (color.name(), not "rgb(r, g, b, a)": Qt's CSS parser warns about the alpha value)
-                widget.setStyleSheet("QPushButton {color: %s;}" % QApplication.palette().color(QPalette.Link).name())
+                widget.setStyleSheet("QPushButton {color: %s;}" % key_style.override_color().name())
             else:
                 label = widget.keycode.label
                 widget.setStyleSheet("QPushButton {}")

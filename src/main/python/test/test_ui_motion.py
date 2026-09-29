@@ -25,15 +25,17 @@ def contrast(a, b):
 
 # ---------------------------------------------------------------- highlight colour
 
-def test_highlight_grey_with_white_text(qtbot):
+def test_highlight_light_with_dark_text(qtbot):
+    """ Selected items (tab, layer, key, checked box) are #F0F0F0 with dark text (2026-09-30; #767676
+    with white text before): on the black keys, tabs and layer buttons the light one stands out """
     import branding_theme
+    import key_style
 
     theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
     hl, hlt = QColor(theme[QPalette.Highlight]), QColor(theme[QPalette.HighlightedText])
-    assert hl.saturation() == 0, "grey, no colour"
-    assert hl.lightness() < QColor("#cccccc").lightness(), "darker than the previous light grey"
-    assert hlt == QColor("#ffffff")
-    assert contrast(hl, hlt) >= 4.5, "white text reads on it (WCAG AA)"
+    assert hl == QColor("#f0f0f0")
+    assert contrast(hl, hlt) >= 7, "dark text on it"
+    assert contrast(hl, QColor(key_style.KEY_FACE)) >= 7, "stands out from the black faces"
     svg = open(os.path.join(os.path.dirname(__file__), "../../resources/base/check.svg"), encoding="utf-8").read()
     assert contrast(hl, QColor(svg.split('stroke="')[1].split('"')[0])) >= 4.5, "the check mark reads on it"
 
@@ -71,7 +73,7 @@ def settled(qtbot, ke):
             break
     b = layer_buttons(ke)
     assert all(x is y for x, y in zip(hl.buttons, b)) and len(hl.buttons) == len(b)
-    assert hl.geometry().topLeft() == b[0].geometry().topLeft()
+    assert hl.geometry().contains(b[0].geometry()) and hl.geometry().contains(b[-1].geometry())
     return b
 
 
@@ -137,7 +139,8 @@ def test_layer_button_stylesheet(qtbot):
     block = re.search(r'QPushButton\[layerButton="true"\][^{]*\{([^}]*)\}', css)
     assert block, "layer button rule"
     assert "background-color: transparent" in block.group(1)
-    assert '[lit="true"]' in css and "color: #ffffff" in css.split('[lit="true"]')[1].split("}")[0]
+    lit_colour = QApplication.palette().color(QPalette.HighlightedText).name()
+    assert '[lit="true"]' in css and "color: " + lit_colour in css.split('[lit="true"]')[1].split("}")[0]
 
 
 # ---------------------------------------------------------------- tab fade

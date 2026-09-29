@@ -51,6 +51,11 @@ def test_busy_keyboard_shows_message_and_deselects(qtbot, monkeypatch):
     mw.on_device_selected()
 
     assert len(warnings) == 1
-    assert "other program" in warnings[0] and "browser" in warnings[0]
+    # compare through the translation: another test may have switched the UI to Japanese already
+    from util import tr
+    expected = tr("MainWindow", "Could not open the keyboard.\n"
+                                "Check that no other program (the browser version, another copy of "
+                                "KeRT-Keymapper, Vial) is using it, then select it again.")
+    assert warnings[0] == expected
     assert mw.autorefresh.current_device is None
     assert mw.combobox_devices.currentIndex() == -1

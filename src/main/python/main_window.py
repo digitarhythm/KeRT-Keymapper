@@ -17,7 +17,7 @@ from editor.alt_repeat_key import AltRepeatKey
 from editor.combos import Combos
 from constants import WINDOW_WIDTH, WINDOW_HEIGHT
 from widgets.editor_container import EditorContainer
-from widgets import tab_fade
+from widgets import tab_fade, key_shadow
 from editor.firmware_flasher import FirmwareFlasher
 from editor.key_override import KeyOverride
 from protocol.keyboard_comm import ProtocolError
@@ -180,6 +180,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(w)
         # every tab widget (editors, pickers, the tabs inside the editors) fades between pages on a click
         tab_fade.enable_all(self)
+        key_shadow.install_all(self)        # and its tabs cast the keys' shadow
 
         self.init_menu()
 
@@ -434,8 +435,9 @@ class MainWindow(QMainWindow):
 
             c = EditorContainer(container)
             self.tabs.addTab(c, tr("MainWindow", lbl))
-        # the editors' own tab widgets join the window only now: give them the fade too
+        # the editors' own tab widgets join the window only now: give them the fade (and tab shadows) too
         tab_fade.enable_all(self)
+        key_shadow.install_all(self)
         # the (centred) tab bar moved: re-place the layer buttons against it
         self.keymap_editor.place_layer_column_later()
 

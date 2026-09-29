@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import QRectF, QSize, Qt
+from PyQt5.QtGui import QPainter
+import key_style
 from PyQt5.QtWidgets import QPushButton, QLabel, QHBoxLayout, QApplication
 
 class SquareButton(QPushButton):
@@ -15,6 +17,23 @@ class SquareButton(QPushButton):
         self.label = None
         self.word_wrap = False
         self.text = ""
+
+    def make_key(self):
+        """A keycode button (picker, display keyboard): drawn as a key, see key_style.DARK_KEYS"""
+        self.setProperty("keyButton", True)
+
+    def paintEvent(self, ev):
+        # dark key look: the stylesheet draws the black face inside KEY_MARGINS; the soft shadow goes
+        # into those margins first (a stylesheet cannot draw shadows)
+        if key_style.DARK_KEYS and self.property("keyButton"):
+            left, top, right, bottom = key_style.KEY_MARGINS
+            face = QRectF(self.rect()).adjusted(left, top, -right, -bottom)
+            r = key_style.KEY_RADIUS
+            p = QPainter(self)
+            p.setRenderHint(QPainter.Antialiasing)
+            key_style.paint_shadow(p, lambda painter: painter.drawRoundedRect(face, r, r))
+            p.end()
+        super().paintEvent(ev)
 
     def setRelSize(self, ratio):
         self.scale = ratio

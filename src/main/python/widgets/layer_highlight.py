@@ -101,6 +101,10 @@ class LayerHighlight(QWidget):
         area = buttons[0].geometry()
         for b in buttons[1:]:
             area = area.united(b.geometry())
+        if key_style.DARK_KEYS:
+            # room around the buttons for their drop shadows
+            blur, offset = key_style.SHADOW_BLUR, key_style.SHADOW_OFFSET
+            area = area.adjusted(-blur, -blur, blur, blur + offset)
         self.setGeometry(area)
         self.lower()
         self.show()
@@ -149,11 +153,20 @@ class LayerHighlight(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
-        # the buttons' own faces (they are transparent so the box can show through them)
-        p.setBrush(pal.color(QPalette.Button))
-        for i in range(len(self.buttons)):
+        # the buttons' own faces (they are transparent so the box can show through them); in the dark
+        # key look black, with the keys' drop shadow under them all first
+        faces = [self.button_rect(i) for i in range(len(self.buttons))]
+        if key_style.DARK_KEYS:
+            r = key_style.KEY_RADIUS
+            for face in faces:
+                key_style.paint_shadow(p, lambda painter, f=face: painter.drawRoundedRect(f, r, r))
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(key_style.KEY_FACE))
+        else:
+            p.setBrush(pal.color(QPalette.Button))
+        for face in faces:
             path = QPainterPath()
-            path.addRoundedRect(self.button_rect(i), r, r)
+            path.addRoundedRect(face, r, r)
             p.drawPath(path)
         p.setBrush(QColor(pal.color(QPalette.Highlight)))
         path = QPainterPath()

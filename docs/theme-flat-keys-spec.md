@@ -27,8 +27,8 @@ flowchart LR
 | WindowText / Text / ButtonText | `#1f2328` | 文字、キーの文字 |
 | Button | `#ffffff` | キー本体 |
 | Mid | `#303030` | キーの輪郭線、全ウィジェットの枠線 |
-| Highlight | `#767676` | 選択中・押下の塗り。グレー（2026-09-27 変更。KeRT グリーン `#00a3a3` → `#cccccc` → `#767676`。詳細は `docs/ui-motion-spec.md`） |
-| HighlightedText | `#ffffff` | Highlight 上の文字（白。`#cccccc` の間だけ濃色 `#1f2328` だった） |
+| Highlight | `#f0f0f0` | 選択中・押下の塗り（2026-09-30 変更。KeRT グリーン `#00a3a3` → `#cccccc` → `#767676` → `#f0f0f0`。詳細は `docs/ui-motion-spec.md`） |
+| HighlightedText | `#1f2328` | Highlight 上の文字（濃色） |
 | Link | `#0969da` | 国別キーマップで上書きされたキーの文字色 |
 | Disabled 系 | `#9aa0a6` | |
 

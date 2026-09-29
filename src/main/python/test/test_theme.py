@@ -140,17 +140,21 @@ def test_flat_key_geometry(qtbot):
 
     w = KeyWidget()
     key = w.widgets[0]
-    assert key.corner == key_style.CORNER_RADIUS
+    assert key.corner == key_style.key_corner()      # 8 with the dark key look, CORNER_RADIUS without
     # no separate "top face": the key is one flat rounded rectangle
     assert key.foreground_draw_path.isEmpty()
     # the legend is centred on the whole key, not shifted up for a shadow
     assert key.text_rect == key.rect
 
 
-def test_flat_key_paint(qtbot):
+def test_flat_key_paint(qtbot, monkeypatch):
+    """ The previous white, outlined key look (key_style.DARK_KEYS = False); the dark look: test_dark_keys.py """
     import branding_theme
     import themes
+    import key_style
     from widgets.key_widget import KeyWidget
+
+    monkeypatch.setattr(key_style, "DARK_KEYS", False)
 
     branding_theme.register()
     themes.Theme.set_theme("KeRT Light")
@@ -179,11 +183,15 @@ def test_flat_key_paint(qtbot):
         themes.Theme.set_theme("KeRT Light")
 
 
-def test_selected_key_filled(qtbot):
-    """ A selected key is filled with the brand colour (not only outlined) and its legend turns white """
+def test_selected_key_filled(qtbot, monkeypatch):
+    """ White outlined look (DARK_KEYS = False): a selected key is filled with the highlight, keeps its
+    outline, and its legend turns white. The dark look: test_dark_keys.py """
     import branding_theme
     import themes
+    import key_style
     from widgets.key_widget import KeyWidget
+
+    monkeypatch.setattr(key_style, "DARK_KEYS", False)
 
     branding_theme.register()
     themes.Theme.set_theme("KeRT Light")
@@ -342,10 +350,9 @@ def test_picker_block_centered(qtbot):
     # block: at least the display keyboard, at most the available width; the keyboard sits at its left
     assert kb.width() - 6 <= block.width() <= alt.available_width()
     assert abs(gx(kb, kb.rect().topLeft()) - gx(block, block.rect().topLeft())) <= 6
-    # block is centred in the tab page
-    page_centre = gx(alt, alt.rect().center())
-    block_centre = gx(block, block.rect().center())
-    assert abs(page_centre - block_centre) <= 6
+    # block is centred in the tab page (wait: the page re-centres the block on the layout pass after the
+    # resize, which can come after the block got its width)
+    qtbot.waitUntil(lambda: abs(gx(alt, alt.rect().center()) - gx(block, block.rect().center())) <= 6, timeout=3000)
     # contents are left-aligned inside the block
     assert abs(gx(kb, kb.rect().topLeft()) - gx(block, block.rect().topLeft())) <= 6
     first_item = alt.key_layout.itemAt(0).widget()   # the "Any" button comes first in the flow

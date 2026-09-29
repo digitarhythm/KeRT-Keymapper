@@ -27,9 +27,9 @@ BRAND_THEMES = [
         QPalette.Mid: "#303030",              # key outline, widget borders
         QPalette.BrightText: "#d1242f",
         QPalette.Link: "#0969da",
-        QPalette.Highlight: "#767676",        # selection / pressed: mid grey, the lightest grey on which white
-                                              # text still meets WCAG AA 4.5:1 (2026-09-27; #cccccc before, KeRT green #00a3a3 originally)
-        QPalette.HighlightedText: "#ffffff",  # white text on the grey
+        QPalette.Highlight: "#f0f0f0",        # selection / pressed: near white, standing out from the black keys,
+                                              # tabs and layer buttons (2026-09-30; #767676 / #cccccc / KeRT green before)
+        QPalette.HighlightedText: "#1f2328",  # dark text on it
         (QPalette.Active, QPalette.Button): "#ffffff",
         (QPalette.Disabled, QPalette.ButtonText): "#9aa0a6",
         (QPalette.Disabled, QPalette.WindowText): "#9aa0a6",
@@ -85,7 +85,7 @@ def stylesheet(name):
     mid = colors[QPalette.Mid]
     r = key_style.CORNER_RADIUS
     w = key_style.OUTLINE_WIDTH
-    return """
+    return ("""
         QPushButton, QToolButton, QComboBox, QSpinBox, QLineEdit, QTextEdit, QPlainTextEdit,
         QScrollArea, QTabWidget::pane, QGroupBox, EntryCard, EntryCardButton {{
             border: {w}px solid {mid};
@@ -159,6 +159,76 @@ def stylesheet(name):
                base=colors[QPalette.Base], disabled=colors[(QPalette.Disabled, QPalette.Text)],
                text=colors[QPalette.ButtonText],
                check='\n            image: url("{}");'.format(CHECK_IMAGE) if CHECK_IMAGE else "")
+            + key_button_style(colors))
+
+
+def key_button_style(colors):
+    """The dark key look (key_style.DARK_KEYS) for picker key buttons, tabs and layer buttons: black
+    face, white legend, no outline, KEY_RADIUS corners. Picker keys and tabs keep KEY_MARGINS free for
+    the shadow painted under them (SquareButton.paintEvent, widgets/key_shadow.py); the layer buttons'
+    faces and shadows are painted by widgets/layer_highlight.py. These rules come last and win."""
+    if not key_style.DARK_KEYS:
+        return ""
+    return """
+        QPushButton[keyButton="true"] {{
+            background-color: {face};
+            color: {legend};
+            border: none;
+            border-radius: {r}px;
+            margin: {mt}px {mr}px {mb}px {ml}px;
+            padding: 0px;
+        }}
+        QPushButton[keyButton="true"]:hover {{
+            background-color: {hover};
+        }}
+        QPushButton[keyButton="true"]:pressed {{
+            background-color: {hl};
+            color: {hlt};
+        }}
+        QPushButton[keyButton="true"] QLabel {{
+            color: {legend};
+        }}
+        QTabBar::tab {{
+            background-color: {face};
+            color: {legend};
+            border: none;
+            border-radius: {r}px;
+            margin: {mt}px {mr}px {mb}px {ml}px;
+            padding: 4px 12px;
+        }}
+        QTabBar::tab:hover {{
+            background-color: {hover};
+        }}
+        QTabBar::tab:selected {{
+            background-color: {hl};
+            color: {hlt};
+        }}
+        DeviceComboBox {{
+            background-color: {face};
+            color: {legend};
+            border: none;
+            border-radius: {r}px;
+            margin: {mt}px {mr}px {mb}px {ml}px;
+        }}
+        DeviceComboBox:hover {{
+            background-color: {hover};
+        }}
+        QPushButton[layerButton="true"], QPushButton[layerButton="true"]:checked,
+        QPushButton[layerButton="true"]:pressed, QPushButton[layerButton="true"]:disabled {{
+            background-color: transparent;
+            color: {legend};
+            border: none;
+            border-radius: {r}px;
+        }}
+        /* the label the highlight box covers: dark on the light box. Listed last, and with :disabled too,
+           because the current layer's button is disabled and the rule above would otherwise win */
+        QPushButton[layerButton="true"][lit="true"], QPushButton[layerButton="true"][lit="true"]:disabled {{
+            color: {hlt};
+        }}
+    """.format(face=key_style.KEY_FACE, legend=key_style.KEY_LEGEND, r=key_style.KEY_RADIUS,
+               hover=key_style.KEY_HOVER_FACE, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
+               ml=key_style.KEY_MARGINS[0], mt=key_style.KEY_MARGINS[1], mr=key_style.KEY_MARGINS[2],
+               mb=key_style.KEY_MARGINS[3])
 
 
 def register():

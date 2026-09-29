@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal
 
 from any_keycode_dialog import AnyKeycodeDialog
 from editor.basic_editor import BasicEditor
+import key_style
 from widgets.layer_highlight import LayerHighlight
 from widgets.keyboard_widget import KeyboardWidget, EncoderWidget
 from keycodes.keycodes import Keycode
@@ -185,6 +186,8 @@ class KeymapEditor(BasicEditor):
         self.layer_highlight.set_buttons(self.layer_buttons)
         for x in range(0,2):
             btn = SquareButton("-") if x else SquareButton("+")
+            btn.make_key()                              # zoom buttons look like keys
+            btn.frame_extra = key_style.OUTLINE_WIDTH   # room for the key margins (shadow)
             btn.setFocusPolicy(Qt.NoFocus)
             btn.setRelSize(2.2)
             btn.setCheckable(False)

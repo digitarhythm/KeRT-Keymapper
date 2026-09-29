@@ -9,9 +9,9 @@
 <style>
 /* highlight colours: the same as the app's KeRT Light palette (branding_theme.py, Highlight / HighlightedText) */
 :root {
-    --kert-highlight: #767676;
-    --kert-highlight-hover: #888888;
-    --kert-highlight-text: #ffffff;
+    --kert-highlight: #f0f0f0;
+    --kert-highlight-hover: #ffffff;
+    --kert-highlight-text: #1f2328;
     --kert-window: #f5f6f8;      /* the app's window background (QPalette.Window) */
 }
 body {
@@ -132,7 +132,7 @@ body {
     font-weight: bold;
     font-family: inherit;
     text-align: center;
-    color: #1f2328;
+    color: #000000;
     cursor: pointer;
 }
 .known_name:hover:enabled {
@@ -142,10 +142,11 @@ body {
     cursor: default;
     opacity: 0.6;
 }
-/* the keyboard being connected: highlight grey (the spinner is the big one over the card, #big_spinner) */
+/* the keyboard being connected: black with a white name, like the app's keys (the spinner is the big
+   one over the card, #big_spinner) */
 .known_name.selected, .known_name.selected:disabled {
-    background-color: var(--kert-highlight);
-    color: var(--kert-highlight-text);
+    background-color: #000000;
+    color: #ffffff;
     opacity: 1;
 }
 /* large loading spinner centred over the selection card while a chosen keyboard connects and starts */
@@ -188,7 +189,7 @@ body {
 #progress_fill {
     height: 100%;
     width: 0;
-    background-color: var(--kert-highlight);
+    background-color: #000000;      /* black, like the keys (the highlight grey barely shows on white) */
     transition: width 0.3s ease-out;
 }
 #progress_label {
@@ -201,7 +202,7 @@ body {
     display: none;
     width: 1em;
     height: 1em;
-    border: 3px solid rgba(255, 255, 255, 0.35);
+    border: 3px solid rgba(31, 35, 40, 0.25);
     border-top-color: var(--kert-highlight-text);
     border-radius: 50%;
     animation: kert-spin 0.8s linear infinite;
@@ -382,7 +383,7 @@ body {
         progress_render();
     }
 
-    // known-keyboard panel while connecting / starting: the chosen box turns grey, a big spinner sits
+    // known-keyboard panel while connecting / starting: the chosen box turns black, a big spinner sits
     // in the middle of the card, the other boxes are disabled and the "another keyboard" button is hidden
     function set_known_status(text, busy) {
         document.querySelectorAll("#known_list .known_name").forEach(function (b) {
