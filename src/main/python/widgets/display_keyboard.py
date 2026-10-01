@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import json
 
+from widgets import key_shadow
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QGridLayout, QWidget, QSizePolicy
 
@@ -42,6 +43,7 @@ class DisplayKeyboard(QWidget):
             self.layout.addWidget(btn, round(key.y * 4), round(key.x * 4), round(key.height * 4), round(key.width * 4))
 
         self.setLayout(self.layout)
+        key_shadow.install_parent(self)     # shadows under the key buttons
 
     def relabel_buttons(self):
         KeycodeDisplay.relabel_buttons(self.buttons)

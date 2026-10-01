@@ -19,21 +19,11 @@ class SquareButton(QPushButton):
         self.text = ""
 
     def make_key(self):
-        """A keycode button (picker, display keyboard): drawn as a key, see key_style.DARK_KEYS"""
+        """A keycode button (picker, display keyboard): drawn as a key, see key_style.DARK_KEYS. The
+        stylesheet draws the black face inside KEY_MARGINS; the parent paints the shadows of all its key
+        buttons in one go (widgets/key_shadow.py, install_parent()) - a Python paintEvent per button was
+        one of the bigger costs of the browser build's start-up"""
         self.setProperty("keyButton", True)
-
-    def paintEvent(self, ev):
-        # dark key look: the stylesheet draws the black face inside KEY_MARGINS; the soft shadow goes
-        # into those margins first (a stylesheet cannot draw shadows)
-        if key_style.DARK_KEYS and self.property("keyButton"):
-            left, top, right, bottom = key_style.KEY_MARGINS
-            face = QRectF(self.rect()).adjusted(left, top, -right, -bottom)
-            r = key_style.KEY_RADIUS
-            p = QPainter(self)
-            p.setRenderHint(QPainter.Antialiasing)
-            key_style.paint_shadow(p, lambda painter: painter.drawRoundedRect(face, r, r))
-            p.end()
-        super().paintEvent(ev)
 
     def setRelSize(self, ratio):
         self.scale = ratio

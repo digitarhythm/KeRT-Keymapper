@@ -65,5 +65,27 @@ def paint_shadow(painter, draw, unit=1.0):
         draw(painter)
     painter.restore()
 
-# keymap: the key under the mouse is drawn this much larger, on top of its neighbours (2026-10-01)
-HOVER_SCALE = 1.08
+# keymap: the key under the mouse grows by HOVER_GROW_PX on every side (screen pixels), on top of its
+# neighbours (2026-10-01; 2026-10-02 a fixed growth instead of 1.08x: wide keys grew far sideways and
+# keys at the edges pushed their frame out of the widget)
+HOVER_GROW_PX = 5
+# the hover zoom grows and shrinks over HOVER_ANIM_MS (ease in-out); an orange frame with HOVER_FRAME_RADIUS
+# corners, HOVER_FRAME_WIDTH thick and HOVER_FRAME_GAP outside the key, fades in with it (2026-10-02)
+HOVER_ANIM_MS = 120
+HOVER_FRAME_COLOR = "#ff8c00"
+HOVER_FRAME_RADIUS = 10
+HOVER_FRAME_WIDTH = 3
+HOVER_FRAME_GAP = 2
+# while hovered (and growing) a key turns white with a black legend, fading with the zoom (2026-10-02);
+# a remapped legend's light blue is unreadable on white, so it turns dark blue then
+HOVER_FACE = "#ffffff"
+HOVER_LEGEND = "#000000"
+HOVER_OVERRIDE_LEGEND = "#0969da"
+
+
+def mix(a, b, t):
+    """Colour t of the way from a to b (0..1)"""
+    from PyQt5.QtGui import QColor
+    a, b = QColor(a), QColor(b)
+    return QColor(round(a.red() + (b.red() - a.red()) * t), round(a.green() + (b.green() - a.green()) * t),
+                  round(a.blue() + (b.blue() - a.blue()) * t))

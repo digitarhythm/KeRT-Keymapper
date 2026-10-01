@@ -60,12 +60,57 @@ def web_get_resource(name):
     return "/usr/local/" + name
 
 
+# KERT_DEBUG_STARTUP=1 (browser: open the page with ?debug=startup) prints the time of each start-up step
+# and a profile of the last stretch ("Finishing": from showing the window to telling the page it is ready)
+DEBUG_STARTUP = bool(os.environ.get("KERT_DEBUG_STARTUP"))
+_debug_clock = None
+_profile = None
+
+
+def _debug(step):
+    global _debug_clock
+    if not DEBUG_STARTUP:
+        return
+    import time
+    now = time.monotonic()
+    if _debug_clock is None:
+        _debug_clock = now
+    print("[startup] %-8s %7.0f ms" % (step, (now - _debug_clock) * 1000), flush=True)
+
+
+def _profile_start():
+    global _profile
+    if DEBUG_STARTUP:
+        import cProfile
+        _profile = cProfile.Profile()
+        _profile.enable()
+
+
+def _profile_report():
+    global _profile
+    if _profile is None:
+        return
+    _profile.disable()
+    import io
+    import pstats
+    out = io.StringIO()
+    pstats.Stats(_profile, stream=out).sort_stats("cumulative").print_stats(30)
+    print("[startup] profile from window.show() to ready:\n" + out.getvalue(), flush=True)
+    _profile = None
+
+
+def _notify_ready():
+    _debug("notified")
+    _profile_report()
+    import vialglue
+    vialglue.notify_ready()
+
+
 def _schedule_notify_ready():
     """Tell the page the app is up (closes the start screen); a no-op outside the browser."""
     if sys.platform == "emscripten":
-        import vialglue
         from PyQt5.QtCore import QTimer
-        QTimer.singleShot(100, vialglue.notify_ready)
+        QTimer.singleShot(100, _notify_ready)
 
 
 def preload(app):
@@ -95,13 +140,18 @@ def main(app):
     """Start with the keyboard the user chose: connect, load, show."""
     global window
     startup_progress.report("connect")
+    _debug("connect")
     if window is None:
         preload(app)
     # the device is available now (the page set its descriptor): take it in and connect
     window.autorefresh.update(quiet=False, hard=True)
+    _debug("loaded")
     startup_progress.report("layout")
+    _profile_start()
     window.show()
+    _debug("shown")
     app.processEvents()
+    _debug("ready")
     startup_progress.report("ready")
     _schedule_notify_ready()
 

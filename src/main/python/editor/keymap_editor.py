@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import json
 
+from widgets import key_shadow
 from PyQt5.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QMessageBox, QSizePolicy, QSpacerItem, QSplitter, QWidget
 from PyQt5.QtCore import Qt, QPoint, QTimer, pyqtSignal
 
@@ -88,6 +89,8 @@ class KeymapEditor(BasicEditor):
         layer_column = QVBoxLayout()
         layer_column.addWidget(self.layer_label)
         layer_column.setAlignment(self.layer_label, Qt.AlignHCenter)
+        # room under the label for the top button's hover growth and frame (LayerHighlight)
+        layer_column.addSpacing(key_style.HOVER_GROW_PX + key_style.HOVER_FRAME_GAP + key_style.HOVER_FRAME_WIDTH)
         layer_column.addLayout(self.layout_layers)
         layer_column.addStretch()
 
@@ -97,7 +100,7 @@ class KeymapEditor(BasicEditor):
 
         # contains the actual keyboard
         self.container = KeyboardWidget(layout_editor)
-        self.container.hover_zoom = True        # the key under the mouse grows a little
+        self.container.enable_hover_zoom()       # the key under the mouse grows a little, with a frame
         self.container.clicked.connect(self.on_key_clicked)
         self.container.deselected.connect(self.on_key_deselected)
 
@@ -194,6 +197,7 @@ class KeymapEditor(BasicEditor):
             btn.setCheckable(False)
             btn.clicked.connect(lambda state, idx=x: self.adjust_size(idx))
             self.layout_size.addWidget(btn)
+            key_shadow.install_parent(btn.parentWidget())   # shadows under the zoom buttons
             self.layer_buttons.append(btn)
 
     def keyboard_space(self):

@@ -225,8 +225,13 @@ def key_button_style(colors):
         QPushButton[layerButton="true"][lit="true"], QPushButton[layerButton="true"][lit="true"]:disabled {{
             color: {hlt};
         }}
+        /* a hovered layer button turns white (LayerHighlight): dark label */
+        QPushButton[layerButton="true"][hovered="true"], QPushButton[layerButton="true"][hovered="true"]:disabled {{
+            color: {hover_legend};
+        }}
     """.format(face=key_style.KEY_FACE, legend=key_style.KEY_LEGEND, r=key_style.KEY_RADIUS,
                hover=key_style.KEY_HOVER_FACE, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
+               hover_legend=key_style.HOVER_LEGEND,
                ml=key_style.KEY_MARGINS[0], mt=key_style.KEY_MARGINS[1], mr=key_style.KEY_MARGINS[2],
                mb=key_style.KEY_MARGINS[3])
 

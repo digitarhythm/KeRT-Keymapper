@@ -444,6 +444,8 @@ body {
         ENV.KERT_LANG = (navigator.language || "en").replace("-", "_");
         // ?debug=motion: the fades print their timing to the console (widgets/tab_fade.py)
         if (/[?&]debug=motion\b/.test(location.search)) ENV.KERT_DEBUG_MOTION = "1";
+        // ?debug=startup: start-up step times and a profile of the "Finishing" stretch (webmain.py)
+        if (/[?&]debug=startup\b/.test(location.search)) ENV.KERT_DEBUG_STARTUP = "1";
     }];
     Module.canvas = document.getElementById("canvas");
     Module.qtCanvasElements = [Module.canvas];

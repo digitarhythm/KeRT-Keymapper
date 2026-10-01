@@ -41,25 +41,94 @@ flowchart LR
 
 1 キーだけの表示（`KeyWidget`）は余白が 1px で影が切れるため、黒いキーのときは余白を 5px（ずれ 2 + ぼかし 3）にする。
 
-## 5. マウスが乗ったキーの拡大（2026-10-01 追加）
+## 5. マウスが乗ったキーの拡大と枠（2026-10-01 追加、2026-10-02 改訂）
 
-上段のキーマップでは、マウスが乗っているキーを `key_style.HOVER_SCALE`（1.08 倍）でキーの中心から拡大して描く。
+上段のキーマップでは、マウスが乗っているキーを各辺 `HOVER_GROW_PX`（5px）大きく描く。オレンジ色
+（`HOVER_FRAME_COLOR` = `#ff8c00`）の枠は、2026-10-02 から選択したキーにだけ付ける（5.2）。拡大・縮小と枠の濃さは `HOVER_ANIM_MS`（120 ms）で滑らかに変わる。
 
-- `KeyboardWidget.hover_zoom` を有効にした部品だけが対象。キーマップの `container` だけが有効で、1 キー表示や
-  マトリクステスターなど他の部品は変わらない。
-- マウスの移動（`MouseMove`）で乗っているキーを判定し、変わったときだけ描き直す。部品から出た（`Leave`）ら解除。
-- 描く順番を変え、乗っているキーを最後に描く（`paint_order()`）。影も同じ順なので、拡大したキーが隣のキーと
-  その影の手前に重なる。
-- 拡大はアニメーションさせず、乗った瞬間に切り替える。キーボード全体の描画は Python の `paintEvent` で、ブラウザ版
-  では重いため、コマ数の要る動きは避けた。
-- 端にあるとても横長のキー（スペースなど）は、拡大した分が部品の余白（5px）を超えると端が少し切れる。
+| 値 | 内容 |
+|---|---|
+| `HOVER_GROW_PX` = 5 | 各辺の拡大量（画面 px）。倍率ではなく一定量にした（1.08 倍だと横長のキーが横に大きく伸び、端のキーの枠が部品の外に出た） |
+| `HOVER_ANIM_MS` = 120 | 拡大・縮小の時間。進み具合に smoothstep（ゆっくり始まりゆっくり止まる）を掛ける |
+| `HOVER_FRAME_RADIUS` = 10 | 枠の角丸（画面 px） |
+| `HOVER_FRAME_WIDTH` = 3 / `HOVER_FRAME_GAP` = 2 | 枠の太さと、拡大したキーとの隙間 |
+
+```mermaid
+flowchart LR
+    M["マウスがキーに乗る / 離れる"] --> T["zoom[キー] の目標を 1 / 0 に"]
+    T --> A["16 ms ごとに進める（120 ms で 0→1）"]
+    A --> R["そのキーの周りだけ描き直し（update(rect)）"]
+    R --> P["描画: 拡大中のキーを最後に、拡大量・枠の濃さは smoothstep"]
+```
+
+- `KeyboardWidget.enable_hover_zoom()` を呼んだ部品だけが対象（キーマップの `container`）。拡大分と枠の分だけ余白
+  （`padding`）を広げるので、上段や右端のキーでも枠が切れない。1 キー表示やマトリクステスターは変わらない。
+- キーごとに拡大の進み具合（0〜1）を持つので、別のキーへ移ると前のキーは縮みながら、次のキーは大きくなる。
+- アニメーション中はキーボード全体ではなく、動いているキーの周りだけを描き直し、描画でも描き直す範囲にかかる
+  キーだけを描く。ブラウザ版では描画が重いため。
+- 枠は拡大の伸び縮みを掛けずに描くので、太さと角丸が均一になる。
 
 | テスト | 確認内容 |
 |---|---|
-| `test_key_hover.py::test_hover_scale_constant` | 拡大率が 1.03〜1.15 |
-| `test_key_hover.py::test_keymap_key_grows_under_the_mouse` | キーに乗ると、キーの左端のすぐ外側がキーの色になり、離れると元に戻る |
-| `test_key_hover.py::test_leaving_the_widget_drops_the_hover` | 部品から出ると拡大が解除される |
-| `test_key_hover.py::test_other_keyboard_widgets_do_not_zoom` | 1 キー表示は拡大しない |
+| `test_key_hover.py::test_hover_grow_constant` / `test_frame_and_animation_constants` | 値の範囲、枠がオレンジで角丸 10 |
+| `test_key_hover.py::test_keymap_key_grows_under_the_mouse` | 乗ると左端のすぐ外側がキーの色になり、離れると戻る |
+| `test_key_hover.py::test_zoom_animates_in_and_out` | 一気に変わらず途中の大きさを通り、縮むときも徐々に戻る |
+| `test_key_hover.py::test_orange_frame_around_the_hovered_key` | 拡大したキーのすぐ外側がオレンジ、離れると消える |
+| `test_key_hover.py::test_animation_repaints_only_around_the_key` | 各コマの描き直し範囲がキーボード全体の半分未満 |
+| `test_key_hover.py::test_frame_fits_inside_the_widget_for_edge_keys` | どのキーでも拡大分と枠が部品の中に収まる |
+| `test_key_hover.py::test_leaving_the_widget_drops_the_hover` / `test_other_keyboard_widgets_do_not_zoom` | 部品から出ると解除、1 キー表示は対象外 |
+
+### 5.1 レイヤーボタン（2026-10-02 追加）
+
+レイヤーボタンも同じ表示にする。マウスが乗ったボタンを各辺 5px 大きくし、オレンジの 10px 角丸の枠を付け、
+120 ms で拡大・縮小する。
+
+- ボタン自体は透明で、見た目は下敷きの `LayerHighlight` が描くので、拡大と枠も `LayerHighlight` が描く。マウスの
+  出入りは各ボタンに付けたイベントフィルタ（`Enter` / `Leave`）で拾う。
+- 描く順番: 影 → 地（拡大中のボタンを最後に）→ 今のレイヤーを示す動く四角（重なっているボタンの拡大分だけ大きく）
+  → オレンジの枠。
+- 下敷きの領域を、影と拡大・枠の分だけボタンの外へ広げる。「Layer」の文字の下にも同じだけ空きを入れ、いちばん上の
+  ボタンの枠が文字に重ならないようにした。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_layer_button_hover_animates` | 乗ると途中の大きさを経て拡大し、離れると戻る |
+| `test_key_hover.py::test_layer_button_hover_grows_with_orange_frame` | 拡大した地がボタンの外まで黒く広がり、その外側がオレンジ |
+| `test_key_hover.py::test_layer_highlight_has_room_for_the_frame` | 下敷きの領域が拡大と枠を含み、「Layer」の文字と枠が重ならない |
+
+### 5.2 オレンジの枠は選択したキーだけ（2026-10-02 変更）
+
+オレンジの枠は、マウスが乗ったキーではなく、クリックして選択したキー（`active_key`）にだけ付ける。
+
+- マウスを乗せたときは拡大のアニメーションだけで、枠は付けない。レイヤーボタンも同じ（枠なしで拡大のみ）。
+- 選択したキーの枠は常に表示し（フェードしない）、そのキーにマウスが乗っていれば拡大した大きさの外側に付く。
+- 枠はキーマップ（`enable_hover_zoom()` を呼んだ部品）だけ。エディタ内の 1 キー表示などには付けない。
+- 描く順番は、選択したキー、拡大中のキーの順に後ろにし、枠や拡大したキーが隣に隠れないようにする。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_orange_frame_only_on_the_selected_key` | 乗せただけでは枠が出ず、クリックすると拡大したキーの外側に出る。離れても選択中は元の大きさの外側に残り、選択を外すと消える |
+| `test_key_hover.py::test_other_keyboard_widgets_have_no_frame` | 1 キー表示は選択しても枠が出ない |
+| `test_key_hover.py::test_layer_button_hover_grows_without_frame` | レイヤーボタンは乗せると拡大するが枠は出ない |
+
+### 5.3 乗せている間は白地（2026-10-02 追加）
+
+マウスを乗せて拡大している間、キーとレイヤーボタンは黒地から白地（`HOVER_FACE` = `#ffffff`）に、文字は白から黒
+（`HOVER_LEGEND` = `#000000`）に変わる。色は拡大と同じ進み具合（smoothstep）で混ぜるので、0.12 秒で滑らかに変わる
+（`key_style.mix()`）。
+
+- 選択中のキー（選択色 `#F0F0F0` とオレンジの枠）と、押下中・ON 表示のキーは、乗せても色を変えない。
+- 割り当てを変えたキーの明るい青の文字は白地で読めないので、半分以上白くなったら濃い青（`HOVER_OVERRIDE_LEGEND`
+  = `#0969da`）にする。
+- レイヤーボタンは下敷き（`LayerHighlight`）が地の色を混ぜ、半分以上白くなったボタンに `hovered` 属性を付けて、
+  スタイルシートで文字を黒にする（操作不可の今のレイヤーにも効くよう `:disabled` も指定）。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_hover_colours_constants` | 白地・黒文字の値、黒と白の中間がグレーになる |
+| `test_key_hover.py::test_hovered_key_turns_white` | 乗せるとグレーを経て白地になり、離れると黒に戻る |
+| `test_key_hover.py::test_hovered_key_legend_turns_dark` | 白地の中に黒い文字がある |
+| `test_key_hover.py::test_hovered_layer_button_turns_white` | レイヤーボタンが白地・黒文字になり、離れると戻る |
 
 ## 4. テスト
 

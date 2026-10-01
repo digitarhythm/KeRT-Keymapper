@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
+from widgets import key_shadow
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout, QHBoxLayout, QSizePolicy, \
     QWIDGETSIZE_MAX
@@ -173,6 +174,7 @@ class AlternativeDisplay(QWidget):
             self.buttons.append(btn)
 
         self.relabel_buttons()
+        key_shadow.install_parent(self.block)   # shadows under the key buttons
         self.update_block_width()
 
     def relabel_buttons(self):
@@ -452,7 +454,11 @@ class TabbedKeycodes(QWidget):
             opt.recreate_keycode_buttons()
 
     def set_wrap_width(self, wrap_width):
-        """Wrap the pickers' contents at wrap_width pixels (None: full width); the block stays centred"""
+        """Wrap the pickers' contents at wrap_width pixels (None: full width); the block stays centred.
+        Called on every resize of the keymap's top pane: the same width again changes nothing."""
+        if wrap_width == self.wrap_width and getattr(self, "_wrap_applied", False):
+            return
+        self._wrap_applied = True
         self.wrap_width = wrap_width
         for opt in [self.all_keycodes, self.basic_keycodes]:
             opt.set_wrap_width(wrap_width)

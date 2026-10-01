@@ -8,8 +8,8 @@ its "lit" property.
 """
 import math
 
-from PyQt5.QtCore import QEasingCurve, QEvent, QPropertyAnimation, QRectF, Qt, pyqtProperty
-from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPalette
+from PyQt5.QtCore import QElapsedTimer, QEasingCurve, QEvent, QPropertyAnimation, QRectF, Qt, QTimer, pyqtProperty
+from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
 from PyQt5.QtWidgets import QApplication, QWidget
 
 import key_style
@@ -28,6 +28,14 @@ class LayerHighlight(QWidget):
         self.animation = QPropertyAnimation(self, b"slide", self)
         self.animation.setDuration(SLIDE_MS)
         self.animation.setEasingCurve(QEasingCurve.InOutCubic)
+        # hover: the button under the mouse grows HOVER_GROW_PX per side with an orange frame, like the
+        # keymap's keys (KeyboardWidget.enable_hover_zoom); per-button progress 0..1, HOVER_ANIM_MS
+        self.hover_index = None
+        self.zoom = {}
+        self.zoom_timer = QTimer(self)
+        self.zoom_timer.setInterval(16)
+        self.zoom_timer.timeout.connect(self.step_zoom)
+        self.zoom_clock = QElapsedTimer()
         self.hide()
 
     # --- slide: the box's position as a (fractional) layer index, animated. (Not "pos": that is
@@ -54,6 +62,9 @@ class LayerHighlight(QWidget):
         self.buttons = list(buttons)
         for b in self.buttons:
             b.installEventFilter(self)
+        self.hover_index = None
+        self.zoom = {}
+        self.zoom_timer.stop()
         self.target = 0
         self.set_slide(0.0)
         self.sync_geometry()
@@ -81,7 +92,61 @@ class LayerHighlight(QWidget):
     def eventFilter(self, obj, ev):
         if ev.type() in (QEvent.Move, QEvent.Resize, QEvent.Show, QEvent.Hide):
             self.sync_geometry()
+        elif ev.type() == QEvent.Enter and obj in self.buttons:
+            self.set_hover(self.buttons.index(obj))
+        elif ev.type() == QEvent.Leave and obj in self.buttons and self.hover_index == self.buttons.index(obj):
+            self.set_hover(None)
         return False
+
+    # --- hover zoom
+
+    def zoom_progress(self, index):
+        return self.zoom.get(index, 0.0)
+
+    def grow(self, index):
+        """How far button `index` has grown on each side, in pixels (smoothstep of its progress)"""
+        t = self.zoom.get(index, 0.0)
+        return key_style.HOVER_GROW_PX * t * t * (3 - 2 * t)
+
+    def update_hovered_labels(self):
+        """A button more than half way to white gets a dark label (stylesheet: [hovered="true"])"""
+        for i, b in enumerate(self.buttons):
+            try:
+                t = self.zoom.get(i, 0.0)
+                want = t * t * (3 - 2 * t) >= 0.5
+                if bool(b.property("hovered")) != want:
+                    b.setProperty("hovered", want)
+                    b.style().unpolish(b)
+                    b.style().polish(b)
+                    b.update()
+            except RuntimeError:
+                pass
+
+    def set_hover(self, index):
+        if index == self.hover_index:
+            return
+        self.hover_index = index
+        if index is not None:
+            self.zoom.setdefault(index, 0.0)
+        if not self.zoom_timer.isActive():
+            self.zoom_clock.start()
+            self.zoom_timer.start()
+        self.step_zoom()
+
+    def step_zoom(self):
+        step = self.zoom_clock.restart() / max(1, key_style.HOVER_ANIM_MS)
+        for i in list(self.zoom):
+            target = 1.0 if i == self.hover_index else 0.0
+            p = self.zoom[i]
+            p = min(target, p + step) if target > p else max(target, p - step)
+            if p <= 0.0 and target == 0.0:
+                del self.zoom[i]
+            else:
+                self.zoom[i] = p
+        self.update_hovered_labels()
+        if all(v == (1.0 if i == self.hover_index else 0.0) for i, v in self.zoom.items()):
+            self.zoom_timer.stop()
+        self.update()
 
     def live_buttons(self):
         live = []
@@ -102,9 +167,10 @@ class LayerHighlight(QWidget):
         for b in buttons[1:]:
             area = area.united(b.geometry())
         if key_style.DARK_KEYS:
-            # room around the buttons for their drop shadows
+            # room around the buttons for their drop shadows and the hover growth with its frame
             blur, offset = key_style.SHADOW_BLUR, key_style.SHADOW_OFFSET
-            area = area.adjusted(-blur, -blur, blur, blur + offset)
+            m = max(blur, key_style.HOVER_GROW_PX + key_style.HOVER_FRAME_GAP + key_style.HOVER_FRAME_WIDTH)
+            area = area.adjusted(-m, -m, m, m + offset)
         self.setGeometry(area)
         self.lower()
         self.show()
@@ -154,22 +220,39 @@ class LayerHighlight(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         # the buttons' own faces (they are transparent so the box can show through them); in the dark
-        # key look black, with the keys' drop shadow under them all first
-        faces = [self.button_rect(i) for i in range(len(self.buttons))]
+        # key look black, with the keys' drop shadow under them all first. A hovered button's face is grown
+        # and drawn last, so it covers its neighbours
+        n = len(self.buttons)
+        order = sorted(range(n), key=lambda i: self.zoom.get(i, 0.0))
+        faces = {i: self.button_rect(i).adjusted(-self.grow(i), -self.grow(i), self.grow(i), self.grow(i))
+                 for i in range(n)}
         if key_style.DARK_KEYS:
             r = key_style.KEY_RADIUS
-            for face in faces:
-                key_style.paint_shadow(p, lambda painter, f=face: painter.drawRoundedRect(f, r, r))
+            for i in order:
+                key_style.paint_shadow(p, lambda painter, f=faces[i]: painter.drawRoundedRect(f, r, r))
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(key_style.KEY_FACE))
         else:
             p.setBrush(pal.color(QPalette.Button))
-        for face in faces:
+        for i in order:
+            if key_style.DARK_KEYS and self.zoom.get(i, 0.0) > 0.0:
+                # hovered: fading from the black face to white with the growth
+                t = self.zoom[i]
+                p.setBrush(key_style.mix(key_style.KEY_FACE, key_style.HOVER_FACE, t * t * (3 - 2 * t)))
+            elif key_style.DARK_KEYS:
+                p.setBrush(QColor(key_style.KEY_FACE))
             path = QPainterPath()
-            path.addRoundedRect(face, r, r)
+            path.addRoundedRect(faces[i], r, r)
             p.drawPath(path)
+        # the sliding box, grown like the button(s) it is over
+        box = self.indicator_rect()
+        lo = max(0, min(int(math.floor(self._slide)), n - 1))
+        hi = min(lo + 1, n - 1)
+        f = self._slide - lo
+        g = self.grow(lo) * (1 - f) + self.grow(hi) * f
         p.setBrush(QColor(pal.color(QPalette.Highlight)))
         path = QPainterPath()
-        path.addRoundedRect(self.indicator_rect(), r, r)
+        path.addRoundedRect(box.adjusted(-g, -g, g, g), r, r)
         p.drawPath(path)
+        # no orange frame here: it marks a selected key on the keymap only (2026-10-02)
         p.end()
