@@ -139,16 +139,16 @@ def test_glue_has_fade():
 
 
 
-def test_keyboard_list_white_chosen_black():
-    """The keyboard list on the start page: white boxes with black names; the one clicked turns black
-    with a white name, like the app's keys (2026-09-30)"""
+def test_keyboard_list_black_chosen_white():
+    """The keyboard list on the start page (2026-10-01): black boxes with white names; the one clicked
+    turns white with a black name and the others fade to 0.1 opacity"""
     import re
     html = page()
     box = css_block(html, ".known_name")
-    assert "background-color:#ffffff" in box and "color:#000000" in box
+    assert "background-color:#000000" in box and "color:#ffffff" in box
     sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1).replace(" ", "")
-    assert "background-color:#000000" in sel and "color:#ffffff" in sel and "opacity:1" in sel
-
+    assert "background-color:#ffffff" in sel and "color:#000000" in sel and "opacity:1" in sel
+    assert "opacity:0.1" in css_block(html, ".known_name:disabled")
 
 
 def test_progress_bar_black():
@@ -156,3 +156,22 @@ def test_progress_bar_black():
     the white track"""
     html = page()
     assert "background-color:#000000" in css_block(html, "#progress_fill")
+
+
+
+def test_progress_percentage_two_tone():
+    """The percentage sits in the bar: black over the white track, white over the black fill (a white
+    copy clipped to the filled part lies on top of a black one)"""
+    import re
+    html = page()
+    assert re.search(r'<div id="progress_bar"><div id="progress_fill"></div>'
+                     r'<div id="progress_text_dark" class="progress_text"></div>'
+                     r'<div id="progress_text_light" class="progress_text"></div></div>', html)
+    assert "position:relative" in css_block(html, "#progress_bar")
+    assert "background-color:#ffffff" in css_block(html, "#progress_bar")
+    assert "color:#000000" in css_block(html, "#progress_text_dark")
+    light = css_block(html, "#progress_text_light")
+    assert "color:#ffffff" in light and "clip-path:inset(0100%00)" in light
+    fn = html[html.index("function progress_render"):html.index("function progress_reset")]
+    assert "progress_text_dark" in fn and "progress_text_light" in fn and "clipPath" in fn
+    assert "Math.round" in fn and '"%"' in fn

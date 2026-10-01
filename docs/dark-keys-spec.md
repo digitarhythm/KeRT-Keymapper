@@ -41,6 +41,26 @@ flowchart LR
 
 1 キーだけの表示（`KeyWidget`）は余白が 1px で影が切れるため、黒いキーのときは余白を 5px（ずれ 2 + ぼかし 3）にする。
 
+## 5. マウスが乗ったキーの拡大（2026-10-01 追加）
+
+上段のキーマップでは、マウスが乗っているキーを `key_style.HOVER_SCALE`（1.08 倍）でキーの中心から拡大して描く。
+
+- `KeyboardWidget.hover_zoom` を有効にした部品だけが対象。キーマップの `container` だけが有効で、1 キー表示や
+  マトリクステスターなど他の部品は変わらない。
+- マウスの移動（`MouseMove`）で乗っているキーを判定し、変わったときだけ描き直す。部品から出た（`Leave`）ら解除。
+- 描く順番を変え、乗っているキーを最後に描く（`paint_order()`）。影も同じ順なので、拡大したキーが隣のキーと
+  その影の手前に重なる。
+- 拡大はアニメーションさせず、乗った瞬間に切り替える。キーボード全体の描画は Python の `paintEvent` で、ブラウザ版
+  では重いため、コマ数の要る動きは避けた。
+- 端にあるとても横長のキー（スペースなど）は、拡大した分が部品の余白（5px）を超えると端が少し切れる。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_hover_scale_constant` | 拡大率が 1.03〜1.15 |
+| `test_key_hover.py::test_keymap_key_grows_under_the_mouse` | キーに乗ると、キーの左端のすぐ外側がキーの色になり、離れると元に戻る |
+| `test_key_hover.py::test_leaving_the_widget_drops_the_hover` | 部品から出ると拡大が解除される |
+| `test_key_hover.py::test_other_keyboard_widgets_do_not_zoom` | 1 キー表示は拡大しない |
+
 ## 4. テスト
 
 | テスト | 確認内容 |

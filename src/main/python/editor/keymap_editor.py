@@ -97,6 +97,7 @@ class KeymapEditor(BasicEditor):
 
         # contains the actual keyboard
         self.container = KeyboardWidget(layout_editor)
+        self.container.hover_zoom = True        # the key under the mouse grows a little
         self.container.clicked.connect(self.on_key_clicked)
         self.container.deselected.connect(self.on_key_deselected)
 

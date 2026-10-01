@@ -127,26 +127,27 @@ body {
     line-height: normal;
     border: 3px solid #303030;
     border-radius: 10px;
-    background-color: #ffffff;
+    background-color: #000000;     /* black like the app's keys (2026-10-01) */
     font-size: 140%;   /* the same size as the buttons (.startup_btn) */
     font-weight: bold;
     font-family: inherit;
     text-align: center;
-    color: #000000;
+    color: #ffffff;
     cursor: pointer;
 }
 .known_name:hover:enabled {
-    background-color: #eeeeee;
+    background-color: #333333;
 }
+/* while one keyboard connects, the others nearly vanish */
 .known_name:disabled {
     cursor: default;
-    opacity: 0.6;
+    opacity: 0.1;
 }
-/* the keyboard being connected: black with a white name, like the app's keys (the spinner is the big
-   one over the card, #big_spinner) */
+/* the keyboard being connected: white with a black name, at full opacity (the spinner is the big one
+   over the card, #big_spinner) */
 .known_name.selected, .known_name.selected:disabled {
-    background-color: #000000;
-    color: #ffffff;
+    background-color: #ffffff;
+    color: #000000;
     opacity: 1;
 }
 /* large loading spinner centred over the selection card while a chosen keyboard connects and starts */
@@ -180,17 +181,44 @@ body {
     display: flex;
 }
 #progress_bar {
-    height: 1.2em;
+    position: relative;
+    height: 1.6em;
     border: 3px solid #303030;
     border-radius: 10px;
     background-color: #ffffff;
     overflow: hidden;
 }
 #progress_fill {
-    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
     width: 0;
     background-color: #000000;      /* black, like the keys (the highlight grey barely shows on white) */
     transition: width 0.3s ease-out;
+}
+/* the percentage in the bar: a black copy over the whole bar, and on top a white copy clipped to the
+   filled (black) part, so the digits are black on white and white on black, even across the edge */
+.progress_text {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 90%;
+    font-weight: bold;
+    pointer-events: none;
+}
+#progress_text_dark {
+    color: #000000;
+}
+#progress_text_light {
+    color: #ffffff;
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 0.3s ease-out;
 }
 #progress_label {
     font-size: 100%;
@@ -259,7 +287,7 @@ body {
             <p id="known_title"></p>
             <div id="known_list"></div>
             <button id="other_btn" type="button" class="startup_btn" onclick="choose_and_connect()"></button>
-            <div id="progress"><div id="progress_bar"><div id="progress_fill"></div></div><div id="progress_label"></div></div>
+            <div id="progress"><div id="progress_bar"><div id="progress_fill"></div><div id="progress_text_dark" class="progress_text"></div><div id="progress_text_light" class="progress_text"></div></div><div id="progress_label"></div></div>
         </div>
         <button id="startup_btn" type="button" class="startup_btn" onclick="connect()" disabled="true"><span id="startup_spinner"></span><span id="startup_label"></span></button><br>
         <div id="error" style="display:none">
@@ -353,7 +381,14 @@ body {
     var g_progress = {active: false, value: 0, target: 0, next: 0, timer: null};
 
     function progress_render() {
-        document.getElementById("progress_fill").style.width = (100 * g_progress.value).toFixed(1) + "%";
+        var percent = 100 * g_progress.value;
+        document.getElementById("progress_fill").style.width = percent.toFixed(1) + "%";
+        // the same number twice: black on the white track, white (clipped to the fill) on the black part
+        var text = Math.round(percent) + "%";
+        document.getElementById("progress_text_dark").textContent = text;
+        var light = document.getElementById("progress_text_light");
+        light.textContent = text;
+        light.style.clipPath = "inset(0 " + (100 - percent).toFixed(1) + "% 0 0)";
     }
 
     function progress_reset(active) {
@@ -383,7 +418,7 @@ body {
         progress_render();
     }
 
-    // known-keyboard panel while connecting / starting: the chosen box turns black, a big spinner sits
+    // known-keyboard panel while connecting / starting: the chosen box turns white, a big spinner sits
     // in the middle of the card, the other boxes are disabled and the "another keyboard" button is hidden
     function set_known_status(text, busy) {
         document.querySelectorAll("#known_list .known_name").forEach(function (b) {

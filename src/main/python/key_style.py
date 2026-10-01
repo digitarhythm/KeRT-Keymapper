@@ -64,3 +64,6 @@ def paint_shadow(painter, draw, unit=1.0):
         painter.setBrush(colour)
         draw(painter)
     painter.restore()
+
+# keymap: the key under the mouse is drawn this much larger, on top of its neighbours (2026-10-01)
+HOVER_SCALE = 1.08

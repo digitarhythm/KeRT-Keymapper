@@ -269,6 +269,9 @@ class KeyboardWidget(QWidget):
         self.padding = KEYBOARD_WIDGET_PADDING
 
         self.setMouseTracking(True)
+        # hover_zoom: draw the key under the mouse key_style.HOVER_SCALE times larger (the keymap turns it on)
+        self.hover_zoom = False
+        self.hover_key = None
 
         self.layout_editor = layout_editor
 
@@ -444,25 +447,16 @@ class KeyboardWidget(QWidget):
             extra_brush.setColor(QColor(key_style.KEY_LEGEND))
             inactive_pen = Qt.NoPen
             # every shadow first, so no key's shadow is drawn over its neighbour
-            for key in self.widgets:
+            for key in self.paint_order():
                 qp.save()
-                qp.scale(self.scale, self.scale)
-                qp.translate(key.shift_x, key.shift_y)
-                qp.translate(key.rotation_x, key.rotation_y)
-                qp.rotate(key.rotation_angle)
-                qp.translate(-key.rotation_x, -key.rotation_y)
+                self.key_transform(qp, key)
                 key_style.paint_shadow(qp, lambda p, k=key: p.drawPath(k.background_draw_path),
                                        unit=1.0 / self.scale if self.scale else 1.0)
                 qp.restore()
 
-        for idx, key in enumerate(self.widgets):
+        for key in self.paint_order():
             qp.save()
-
-            qp.scale(self.scale, self.scale)
-            qp.translate(key.shift_x, key.shift_y)
-            qp.translate(key.rotation_x, key.rotation_y)
-            qp.rotate(key.rotation_angle)
-            qp.translate(-key.rotation_x, -key.rotation_y)
+            self.key_transform(qp, key)
 
             active = key.active or (self.active_key == key and not self.active_mask)
 
@@ -559,6 +553,32 @@ class KeyboardWidget(QWidget):
 
         return None, False
 
+    def paint_order(self):
+        """All keys, the hovered one last so that its larger drawing covers its neighbours"""
+        hover = self.hover_key if self.hover_key in self.widgets else None
+        if hover is None:
+            return self.widgets
+        return [k for k in self.widgets if k is not hover] + [hover]
+
+    def key_transform(self, qp, key):
+        """Painter transform for one key: widget scale, the key's place and rotation, and the hover zoom
+        around the key's own centre"""
+        qp.scale(self.scale, self.scale)
+        qp.translate(key.shift_x, key.shift_y)
+        qp.translate(key.rotation_x, key.rotation_y)
+        qp.rotate(key.rotation_angle)
+        qp.translate(-key.rotation_x, -key.rotation_y)
+        if key is self.hover_key:
+            centre = QRectF(key.rect).center()
+            qp.translate(centre)
+            qp.scale(key_style.HOVER_SCALE, key_style.HOVER_SCALE)
+            qp.translate(-centre)
+
+    def set_hover(self, key):
+        if key is not self.hover_key:
+            self.hover_key = key
+            self.update()
+
     def mousePressEvent(self, ev):
         if not self.enabled:
             return
@@ -603,6 +623,10 @@ class KeyboardWidget(QWidget):
                 QToolTip.hideText()
         elif ev.type() == QEvent.LayoutRequest:
             self.update_layout()
+        elif ev.type() == QEvent.MouseMove and self.hover_zoom:
+            self.set_hover(self.hit_test(ev.pos())[0] if self.enabled else None)
+        elif ev.type() == QEvent.Leave and self.hover_zoom:
+            self.set_hover(None)
         elif ev.type() == QEvent.MouseButtonDblClick and self.active_key:
             self.anykey.emit()
         return super().event(ev)
