@@ -175,3 +175,20 @@ def test_progress_percentage_two_tone():
     fn = html[html.index("function progress_render"):html.index("function progress_reset")]
     assert "progress_text_dark" in fn and "progress_text_light" in fn and "clipPath" in fn
     assert "Math.round" in fn and '"%"' in fn
+
+
+def test_python_from_the_page_wakes_qt_timers():
+    """Qt for wasm (5.14) only schedules the browser timer that runs Qt timers and posted events from inside
+    its own callbacks and from input events; Python run by the page's {cmd: "py"} message (webmain.main)
+    must ask for it, or QTimer.singleShot(100, ...) waits for the next unrelated wake-up, ~20 s at start
+    (docs/web-startup-progress-spec.md)"""
+    web = os.path.dirname(PAGE)
+    c = open(os.path.join(web, "main.c"), encoding="utf-8").read()
+    assert "void kert_wake_qt(void)" in c
+    assert "_ZN20QWasmEventDispatcher14maintainTimersEv();" in c
+    build = open(os.path.join(web, "build.sh"), encoding="utf-8").read()
+    assert '"_kert_wake_qt"' in build
+    worker = open(os.path.join(web, "worker.js"), encoding="utf-8").read()
+    run = worker[worker.index('e.data.cmd == "py"'):]
+    run = run[:run.index("} else {")]
+    assert run.index("_PyRun_SimpleString(") < run.index("_kert_wake_qt();")

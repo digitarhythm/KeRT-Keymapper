@@ -79,6 +79,16 @@ void vialglue_set_response_error(uint8_t *data) {
     glue_ready = 1;
 }
 
+// QWasmEventDispatcher::maintainTimers() (Qt for wasm 5.14, a static C++ member): schedules the browser
+// timer that runs Qt's due timers and posted events. Qt calls it only from its own callbacks and from
+// input events, so Python run by the page ({cmd: "py"}, worker.js) has to ask for it - otherwise the
+// QTimers it starts wait for the next unrelated wake-up, ~20 s at start (docs/web-startup-progress-spec.md)
+extern void _ZN20QWasmEventDispatcher14maintainTimersEv(void);
+
+void kert_wake_qt(void) {
+    _ZN20QWasmEventDispatcher14maintainTimersEv();
+}
+
 const char *g_device_desc = "";
 
 void vialglue_set_device_desc(const char *s) {

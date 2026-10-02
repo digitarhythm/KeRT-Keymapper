@@ -8,6 +8,8 @@ function kert_handle_message(e, original) {
     if (e.data.cmd == "py") {
         try {
             _PyRun_SimpleString(kert_c_string(e.data.payload));
+            // let Qt schedule the timers and posted events this Python started (main.c kert_wake_qt)
+            _kert_wake_qt();
         } catch (ex) {
             // never leave the page waiting with a spinner: report the failure
             postMessage({cmd: "fatal_error", msg: "Python start failed: " + ex});

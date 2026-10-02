@@ -57,9 +57,11 @@ sequenceDiagram
 
 ## 「仕上げ」の短縮（2026-10-02）
 
-「仕上げ」は、`window.show()` の後に起動完了をページへ知らせるまでの区間。完了の通知は 0.1 秒後のタイマーで
-出すが、それまでにたまった処理（配置の計算と描画）が終わるまで実行されない。ブラウザ版の Qt は画面への反映を
-ブラウザの描画タイミングに合わせるため、たまった描画が多いほど長くなる（非表示のタブでは終わらなかった）。
+「仕上げ」は、`window.show()` の後に起動完了をページへ知らせるまでの区間。完了の通知は
+`QTimer.singleShot(100, _notify_ready)` で出す。
+
+> 訂正: 最初の計測（下表「仕上げ 3.9 → 0.1 秒」）は非表示のタブで取ったもので誤り。表示中のタブでは
+> この区間が毎回 20〜25 秒かかっていた。原因と対策は下の「仕上げが 20 秒以上かかる原因」を参照。
 
 ### 計測
 
@@ -94,3 +96,49 @@ sequenceDiagram
 | `test_startup_cost.py::test_picker_key_shadows_painted_by_the_parent` | `SquareButton` に Python の描画処理がなく、キーの親に影を描くフィルタが付いている |
 
 残りで最も長いのは「画面の作成」（9 秒前後、キーボードを読み込んだ後の画面の組み立て）。
+
+## 仕上げが 20 秒以上かかる原因（2026-10-02）
+
+### 原因
+
+ブラウザ版の Qt（Qt 5.14 for WebAssembly）は、Qt のタイマーとポストされたイベントを処理するための
+ブラウザのタイマー（`emscripten_async_call`）を `QWasmEventDispatcher::maintainTimers()` でしか予約しない。
+これを呼ぶのは Qt 自身のタイマー処理と、マウス・キーボードの入力処理だけ。
+
+ページが `{cmd: "py"}` で実行する Python（`webmain.main()`）が作ったタイマー（完了通知の 0.1 秒タイマーなど）には
+起こす予約が付かず、それより前に予約されていた無関係の約 30 秒のタイマーが来るまで Qt が眠っていた。
+その間、ワーカーは何もしていない（計測で確認）。デスクトップ版は普通のイベントループなので一瞬で起動する。
+
+```mermaid
+sequenceDiagram
+    participant Page as ページ
+    participant W as ワーカー (worker.js)
+    participant Py as Python (webmain)
+    participant Qt as Qt のディスパッチャ
+    Page->>W: {cmd: "py"} webmain.main(...)
+    W->>Py: PyRun_SimpleString
+    Py->>Qt: QTimer.singleShot(100, _notify_ready)
+    Note over Qt: 修正前: 起こす予約なし → 約 30 秒後の別のタイマーまで停止
+    W->>Qt: 修正後: kert_wake_qt() → maintainTimers()
+    Qt-->>Py: 0.1 秒後に _notify_ready
+    Py-->>Page: notify_ready（起動画面を閉じる）
+```
+
+### 対策
+
+| 場所 | 内容 |
+|---|---|
+| `web/src/main.c` | `kert_wake_qt()` を追加。`QWasmEventDispatcher::maintainTimers()`（C++ の静的メンバ）を呼ぶ |
+| `web/src/build.sh` | `_kert_wake_qt` を `EXPORTED_FUNCTIONS` に追加 |
+| `web/src/worker.js` | `{cmd: "py"}` で `PyRun_SimpleString` を実行した直後に `_kert_wake_qt()` を呼ぶ |
+
+### 計測（表示中のタブ、キーボード選択のクリックから）
+
+| 段階 | 修正前 | 修正後 |
+|---|---|---|
+| ready（表示完了） | 3.5 秒 | 3.7 秒 |
+| notified（起動画面が閉じる） | 21〜26 秒 | 3.8 秒 |
+
+| テスト | 確認内容 |
+|---|---|
+| `test_web_start_page.py::test_python_from_the_page_wakes_qt_timers` | `main.c` に `kert_wake_qt`、`build.sh` で書き出し、`worker.js` が Python 実行の後に呼ぶ |
