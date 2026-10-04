@@ -207,7 +207,23 @@ static PyObject* vialglue_fade(PyObject *self, PyObject *args) {
     return PyLong_FromLong(0);
 }
 
+// Theme menu: Qt for wasm keeps QSettings in memory only, so the page stores the chosen theme
+// (localStorage) and hands it back as KERT_THEME at the next start (branding_theme.save_theme)
+static PyObject* vialglue_save_theme(PyObject *self, PyObject *args) {
+    const char *name;
+
+    if (!PyArg_ParseTuple(args, "s", &name))
+        return NULL;
+
+    EM_ASM({
+        postMessage({cmd: "theme", name: UTF8ToString($0)});
+    }, name);
+
+    return PyLong_FromLong(0);
+}
+
 static PyMethodDef VialglueMethods[] = {
+    {"save_theme",  vialglue_save_theme, METH_VARARGS, ""},
     {"progress",  vialglue_progress, METH_VARARGS, ""},
     {"fade",  vialglue_fade, METH_VARARGS, ""},
     {"write_device",  vialglue_write_device, METH_VARARGS, ""},

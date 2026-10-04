@@ -20,6 +20,10 @@
         <translation>テーマを完全に適用するにはアプリケーションを再起動してください。</translation>
     </message>
     <message>
+        <source>In order to fully apply the theme you should reload the page.</source>
+        <translation>テーマを完全に適用するにはページを再読み込みしてください。</translation>
+    </message>
+    <message>
         <source>Unsupported protocol version!
 Please download latest Vial from https://get.vial.today/</source>
         <translation>対応していないプロトコルバージョンです。

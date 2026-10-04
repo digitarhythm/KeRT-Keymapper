@@ -3,6 +3,18 @@ function kert_c_string(s) {
     return (typeof stringToNewUTF8 === "function") ? stringToNewUTF8(s) : allocateUTF8(s);
 }
 
+// Qt (qwasmopenglcontext.cpp) asks for a multisampled (antialias: true) WebGL canvas, but it only copies the
+// window images it painted itself onto it: multisampling adds nothing there and makes every frame of a
+// full-window, device-pixel canvas (5120 x 2466 on a large Retina screen) slow to produce, so hover and
+// animations stutter (docs/web-render-cost-spec.md). Ask for a plain one instead.
+if (typeof OffscreenCanvas !== "undefined") {
+    var kert_get_context = OffscreenCanvas.prototype.getContext;
+    OffscreenCanvas.prototype.getContext = function (type, attributes) {
+        if (/webgl/.test(type) && attributes) attributes.antialias = false;
+        return kert_get_context.call(this, type, attributes);
+    };
+}
+
 // The page starts Python with a {cmd: "py"} message to this (the main program's) worker.
 function kert_handle_message(e, original) {
     if (e.data.cmd == "py") {

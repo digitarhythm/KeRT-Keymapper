@@ -269,10 +269,11 @@ class KeyboardWidget(QWidget):
         self.padding = KEYBOARD_WIDGET_PADDING
 
         self.setMouseTracking(True)
-        # hover_zoom: grow the key under the mouse by key_style.HOVER_GROW_PX on every side, with an orange frame,
+        # hover_zoom: grow the key under the mouse by key_style.HOVER_GROW_PX on every side, with a white frame,
         # growing and shrinking over HOVER_ANIM_MS (the keymap turns it on)
         self.hover_zoom = False
         self.hover_key = None
+        self.after_paint = None             # called once after the next paint
         self.zoom = {}              # key -> progress 0..1 of its zoom (only keys that are zoomed at all)
         self._laid_out_for = None   # (scale, padding) of the last update_layout()
         self.zoom_timer = QTimer(self)
@@ -374,13 +375,24 @@ class KeyboardWidget(QWidget):
             max_w = max(max_w, p.x() * self.scale)
             max_h = max(max_h, p.y() * self.scale)
 
-        self.width = round(max_w + 2 * self.padding)
-        self.height = round(max_h + 2 * self.padding)
+        size = (round(max_w + 2 * self.padding), round(max_h + 2 * self.padding))
+        resized = size != (self.width, self.height)
+        self.width, self.height = size
 
         self.update()
-        self.updateGeometry()
+        # only when the size changed: updateGeometry() runs the layouts up to the main window, which then
+        # repaints everything (a layer switch repainted the whole window, ~120 ms in the browser)
+        if resized:
+            self.updateGeometry()
 
     def paintEvent(self, event):
+        self._paint(event)
+        if self.after_paint is not None:
+            # once, right after this paint (KeymapEditor.switch_layer: the layer highlight's slide)
+            callback, self.after_paint = self.after_paint, None
+            QTimer.singleShot(0, callback)
+
+    def _paint(self, event):
         qp = QPainter()
         qp.begin(self)
         qp.setRenderHint(QPainter.Antialiasing)
@@ -450,12 +462,15 @@ class KeyboardWidget(QWidget):
         dark = key_style.FLAT_KEYS and key_style.DARK_KEYS
         if dark:
             regular_pen.setColor(QColor(key_style.KEY_LEGEND))
-            background_brush.setColor(QColor(key_style.KEY_FACE))
+            background_brush.setColor(key_style.face_color())
             mask_brush.setColor(QColor(key_style.KEY_MASK_FACE))
             extra_brush.setColor(QColor(key_style.KEY_LEGEND))
             inactive_pen = Qt.NoPen
-            # every shadow first, so no key's shadow is drawn over its neighbour
+            # every shadow first, so no key's shadow is drawn over its neighbour; but the hovered key's, drawn
+            # with it on top of its neighbours
             for key in self.paint_order(event.rect()):
+                if key is self.hover_key and self.hover_zoom:
+                    continue
                 qp.save()
                 self.key_transform(qp, key)
                 key_style.paint_shadow(qp, lambda p, k=key: p.drawPath(k.background_draw_path),
@@ -465,6 +480,9 @@ class KeyboardWidget(QWidget):
         for key in self.paint_order(event.rect()):
             qp.save()
             self.key_transform(qp, key)
+            if dark and key is self.hover_key and self.hover_zoom:
+                key_style.paint_shadow(qp, lambda p, k=key: p.drawPath(k.background_draw_path),
+                                       unit=1.0 / self.scale if self.scale else 1.0)
 
             active = key.active or (self.active_key == key and not self.active_mask)
 
@@ -478,19 +496,16 @@ class KeyboardWidget(QWidget):
                 brush = background_on_brush
             elif active and key_style.FLAT_KEYS:
                 brush = selected_brush
-            # hovered (keymap, dark look): fading from the black face to white with the zoom
-            hover = self.zoom_eased(key) if (dark and self.hover_zoom) else 0.0
-            if hover > 0.0 and brush is background_brush:
-                brush = QBrush(key_style.mix(key_style.KEY_FACE, key_style.HOVER_FACE, hover))
+            if dark and key is self.hover_key and self.hover_zoom:
+                # the faces are translucent: an opaque backdrop in the page colour first, so the neighbours
+                # under the grown key do not show through it and it reads as the top one
+                qp.setBrush(self.palette().color(QPalette.Window))
+                qp.drawPath(key.background_draw_path)
             qp.setBrush(brush)
             qp.drawPath(key.background_draw_path)
             legend_pen = selected_text_pen if (active and key_style.FLAT_KEYS and not key.pressed and not key.on) \
                 else regular_pen
             legend_colour = key.color
-            if hover > 0.0 and brush is not selected_brush and not key.pressed and not key.on:
-                legend_pen = QPen(key_style.mix(key_style.KEY_LEGEND, key_style.HOVER_LEGEND, hover))
-                if key.color and hover >= 0.5:
-                    legend_colour = QColor(key_style.HOVER_OVERRIDE_LEGEND)
 
             # draw keycap foreground
             qp.setPen(Qt.NoPen)
@@ -530,9 +545,12 @@ class KeyboardWidget(QWidget):
 
             qp.restore()
 
-            # the selected key's orange frame (keymap only)
+            # the selected key's orange frame, else the hovered key's white one fading in with the zoom
+            # (keymap only)
             if self.hover_zoom and key is self.active_key:
                 self.paint_select_frame(qp, key)
+            elif self.hover_zoom and self.zoom.get(key, 0.0) > 0.0:
+                self.paint_select_frame(qp, key, key_style.HOVER_RING_COLOR, self.zoom_eased(key))
 
         qp.end()
 
@@ -576,12 +594,13 @@ class KeyboardWidget(QWidget):
 
     def paint_order(self, area=None):
         """Keys to draw: those touching `area` (the region being repainted; None = all); the selected key
-        (its frame) and then the zoomed ones last, the most zoomed on top, so they cover their neighbours"""
+        (its frame) and then the zoomed ones last, the most zoomed on top, so they cover their neighbours;
+        the key under the mouse is always the very last, also while the key it left is still bigger"""
         keys = self.widgets
         if area is not None:
             keys = [k for k in keys if self.key_screen_rect(k).intersects(area)]
-        rank = lambda k: (self.zoom.get(k, 0.0), k is self.active_key)
-        if not any(rank(k) != (0.0, False) for k in keys):
+        rank = lambda k: (k is self.hover_key, self.zoom.get(k, 0.0), k is self.active_key)
+        if not any(rank(k) != (False, 0.0, False) for k in keys):
             return keys
         return sorted(keys, key=rank)
 
@@ -615,7 +634,10 @@ class KeyboardWidget(QWidget):
     def step_zoom(self):
         """One animation frame: move every zoomed key toward its target (1 under the mouse, 0 elsewhere)
         and repaint only the area those keys cover"""
-        step = self.zoom_clock.restart() / max(1, key_style.HOVER_ANIM_MS)
+        if key_style.HOVER_ANIM_MS <= 0:
+            step = 1.0
+        else:
+            step = self.zoom_clock.restart() / max(1, key_style.HOVER_ANIM_MS)
         dirty = QRect()
         for key in list(self.zoom):
             if key not in self.widgets:
@@ -634,12 +656,14 @@ class KeyboardWidget(QWidget):
         if not dirty.isEmpty():
             self.update(dirty)
 
-    def paint_select_frame(self, qp, key):
-        """Orange rounded frame just outside the selected (clicked) key, around its grown size when the
-        mouse is on it too (2026-10-02: only the selected key, not the hovered one)"""
+    def paint_select_frame(self, qp, key, colour=key_style.HOVER_FRAME_COLOR, opacity=1.0):
+        """Rounded frame just outside a key, around its grown size when the mouse is on it: orange for the
+        selected (clicked) key, white (key_style.HOVER_RING_COLOR, fading with the zoom) for the hovered one"""
         # drawn without the zoom's stretch, so the frame is evenly HOVER_FRAME_WIDTH thick with round corners
         unit = 1.0 / self.scale if self.scale else 1.0
-        pen = QPen(QColor(key_style.HOVER_FRAME_COLOR), key_style.HOVER_FRAME_WIDTH * unit)
+        c = QColor(colour)
+        c.setAlphaF(max(0.0, min(1.0, opacity)))
+        pen = QPen(c, key_style.HOVER_FRAME_WIDTH * unit)
         out = self.zoom_grow(key) + (key_style.HOVER_FRAME_GAP + key_style.HOVER_FRAME_WIDTH / 2) * unit
         radius = key_style.HOVER_FRAME_RADIUS * unit
         qp.save()
@@ -672,6 +696,9 @@ class KeyboardWidget(QWidget):
         self.hover_key = key
         if key is not None:
             self.zoom.setdefault(key, 0.0)
+        if key_style.HOVER_ANIM_MS <= 0:
+            self.step_zoom()             # no animation: one step to the end, no timer
+            return
         if not self.zoom_timer.isActive():
             self.zoom_clock.start()
             self.zoom_timer.start()

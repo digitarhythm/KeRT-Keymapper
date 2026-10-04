@@ -101,11 +101,24 @@ def test_start_page_uses_the_app_highlight():
     import branding_theme
 
     html = page()
-    theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
+    theme = dict(branding_theme.BRAND_THEMES)["KeRT Color"]
     root = re.search(r":root\s*\{([^}]*)\}", html)
     assert root, "colours are defined once in :root"
     assert "--kert-highlight: %s;" % theme[QPalette.Highlight] in root.group(1)
     assert "--kert-highlight-text: %s;" % theme[QPalette.HighlightedText] in root.group(1)
+    # the page follows the rebuilt (Arc) KeRT Color too (2026-10-04): window, text, outlines, the keys
+    import key_style
+    assert "--kert-window: %s;" % theme[QPalette.Window] in root.group(1)
+    assert "--kert-text: %s;" % theme[QPalette.WindowText] in root.group(1)
+    assert "--kert-border: %s;" % theme[QPalette.Mid] in root.group(1)
+    assert "--kert-key: %s;" % key_style.KEY_FACE in root.group(1)
+    assert "--kert-key-text: %s;" % key_style.KEY_LEGEND in root.group(1)
+    style = html[html.index("<style>"):html.index("</style>")]
+    rest = style.replace(root.group(0), "")
+    # the page behind the start card and the app is the window colour too (upstream's light grey #ccc before)
+    assert "#ccc;" not in rest.lower()
+    for old in ("#f5f6f8", "#303030", "#1f2328", "#000000"):
+        assert old not in rest.lower(), "a colour of the old light page left in the CSS: " + old
     for green in ("#00a3a3", "#00b8b8", "#e6f7f7"):
         assert green not in html.lower(), green
     assert "background-color: var(--kert-highlight)" in css_block(html, ".startup_btn").replace("background-color:", "background-color: ") \
@@ -140,14 +153,15 @@ def test_glue_has_fade():
 
 
 def test_keyboard_list_black_chosen_white():
-    """The keyboard list on the start page (2026-10-01): black boxes with white names; the one clicked
-    turns white with a black name and the others fade to 0.1 opacity"""
+    """The keyboard list on the start page: boxes like the app's keys (2026-10-04: white with dark names;
+    black with white names before); the one clicked takes the highlight and the others fade to 0.1"""
     import re
     html = page()
     box = css_block(html, ".known_name")
-    assert "background-color:#000000" in box and "color:#ffffff" in box
+    assert "background-color:var(--kert-key)" in box and "color:var(--kert-key-text)" in box
     sel = re.search(r"\.known_name\.selected[^{]*\{([^}]*)\}", html).group(1).replace(" ", "")
-    assert "background-color:#ffffff" in sel and "color:#000000" in sel and "opacity:1" in sel
+    assert "background-color:var(--kert-highlight)" in sel and "color:var(--kert-highlight-text)" in sel \
+        and "opacity:1" in sel
     assert "opacity:0.1" in css_block(html, ".known_name:disabled")
 
 
@@ -155,7 +169,8 @@ def test_progress_bar_black():
     """The start-up progress bar fills in black (2026-09-30): the light highlight grey barely showed on
     the white track"""
     html = page()
-    assert "background-color:#000000" in css_block(html, "#progress_fill")
+    assert "background-color:var(--kert-highlight)" in css_block(html, "#progress_fill"), \
+        "the highlight blue (2026-10-04; black before)"
 
 
 
@@ -168,10 +183,10 @@ def test_progress_percentage_two_tone():
                      r'<div id="progress_text_dark" class="progress_text"></div>'
                      r'<div id="progress_text_light" class="progress_text"></div></div>', html)
     assert "position:relative" in css_block(html, "#progress_bar")
-    assert "background-color:#ffffff" in css_block(html, "#progress_bar")
-    assert "color:#000000" in css_block(html, "#progress_text_dark")
+    assert "background-color:var(--kert-key)" in css_block(html, "#progress_bar")
+    assert "color:var(--kert-key-text)" in css_block(html, "#progress_text_dark")
     light = css_block(html, "#progress_text_light")
-    assert "color:#ffffff" in light and "clip-path:inset(0100%00)" in light
+    assert "color:var(--kert-highlight-text)" in light and "clip-path:inset(0100%00)" in light
     fn = html[html.index("function progress_render"):html.index("function progress_reset")]
     assert "progress_text_dark" in fn and "progress_text_light" in fn and "clipPath" in fn
     assert "Math.round" in fn and '"%"' in fn
@@ -192,3 +207,27 @@ def test_python_from_the_page_wakes_qt_timers():
     run = worker[worker.index('e.data.cmd == "py"'):]
     run = run[:run.index("} else {")]
     assert run.index("_PyRun_SimpleString(") < run.index("_kert_wake_qt();")
+
+
+def test_page_keeps_the_theme():
+    """The Theme menu on the web (2026-10-04): Qt keeps QSettings in memory only, so the app sends the choice
+    (vialglue.save_theme -> {cmd: "theme"}) and the page keeps it in localStorage, handing it back to Python
+    as ENV.KERT_THEME at the next start (docs/theme-menu-spec.md)"""
+    html = page()
+    c = open(os.path.join(os.path.dirname(PAGE), "main.c"), encoding="utf-8").read()
+    assert '{"save_theme",  vialglue_save_theme, METH_VARARGS, ""}' in c
+    assert 'cmd: "theme"' in c
+    assert 'e.data.cmd == "theme"' in html
+    assert 'localStorage.setItem("kert_theme"' in html
+    assert 'ENV.KERT_THEME = ' in html and 'localStorage.getItem("kert_theme")' in html
+
+
+def test_worker_asks_for_a_plain_webgl_canvas():
+    """Qt asks for a multisampled (antialias) WebGL canvas although it only copies its own painted images
+    onto it; on a large Retina canvas that made every frame slow and hover animations stutter. The worker
+    turns antialias off before Qt creates the context (docs/web-render-cost-spec.md)"""
+    worker = open(os.path.join(os.path.dirname(PAGE), "worker.js"), encoding="utf-8").read()
+    assert "OffscreenCanvas.prototype.getContext = function (type, attributes)" in worker
+    assert "attributes.antialias = false;" in worker
+    # set up at the top level, before the "py" handler: Qt creates its context while the app starts
+    assert worker.index("OffscreenCanvas.prototype.getContext") < worker.index("function kert_handle_message")

@@ -23,7 +23,7 @@ Web 版の起動ページの色変数（`web/src/index.html` の `:root`）も�
 | 項目 | 値 |
 |---|---|
 | 時間 | 250 ms（`layer_highlight.SLIDE_MS`） |
-| 動き | `QEasingCurve.InOutCubic`（ゆっくり動き出し、ゆっくり止まる） |
+| 動き | `QEasingCurve.OutCubic`（速く動き出し、ゆっくり止まる。2026-10-04 までは InOutCubic） |
 | 白文字になるボタン | 四角がボタンの中央線（文字の位置）を覆っているボタンだけ。2 つのボタンの中間では両方とも濃色文字のまま |
 
 ```mermaid
@@ -127,7 +127,7 @@ sequenceDiagram
 | テスト | 確認内容 |
 |---|---|
 | `test_ui_motion.py::test_highlight_grey_with_white_text` | ハイライトが無彩色で `#cccccc` より暗く、白文字・白チェックマークとのコントラスト比 4.5 以上 |
-| `test_ui_motion.py::test_layer_highlight_slides` | レイヤー切り替えでアニメーションが走り（InOut 系、150〜400 ms）、途中の位置を通って目的のレイヤーに止まる。止まった位置のボタンだけ白文字 |
+| `test_ui_motion.py::test_layer_highlight_slides` | レイヤー切り替えでアニメーションが走り（InOut 系、150〜400 ms）、途中の位置を通って目的のレイヤーに止まる。止まった位置のボタンだけ選択文字色 |
 | `test_ui_motion.py::test_layer_highlight_rect_follows_button` | 止まったときの四角がボタンと同じ位置・大きさ |
 | `test_ui_motion.py::test_label_white_only_when_covered` | 2 つのボタンの中間では両方とも濃色文字 |
 | `test_ui_motion.py::test_layer_button_stylesheet` | レイヤーボタンの背景が透明、覆われたボタンは白文字 |
@@ -138,3 +138,59 @@ sequenceDiagram
 | `test_web_start_page.py::test_page_draws_the_tab_fade` | ページに `#page_fade` があり、クリックを受けず、メッセージ `fade` で CSS の transition を使う。`requestAnimationFrame` に頼らず、5 秒の安全策がある |
 | `test_web_start_page.py::test_glue_has_fade` | `web/src/main.c` に `fade` が登録され、`cmd: "fade"` を送る |
 | `test_ui_motion.py::test_lit_labels_correct_after_first_layout` | 配置前のボタンを渡されても、配置後はレイヤー 0 の番号だけが白文字 |
+
+## レイヤー切り替え: キーマップの書き換えとスライドを同時に見せる（2026-10-04）
+
+レイヤーボタンを押したとき、新しいキーマップが出るのと同時に、選択表示（`LayerHighlight` の四角）のスライド
+（250 ms、OutCubic）が動き出して見えるようにする。
+
+### 計測（ブラウザ版、クリックからの ms）と原因
+
+| 修正前 | |
+|---|---|
+| 33 | クリックの処理が終わる（キーマップの凡例を書き換え） |
+| 124〜251 | キーマップ全体の描き直し（127 ms） |
+| 338 | 四角の描画: まだ 0 の位置 |
+| 415〜532 | **ウィンドウ全体の描き直し**（キーマップをもう一度、117 ms） |
+| 576 | 四角の描画: もう終点（スライドが見えない） |
+
+- `updateGeometry()`（キーマップの大きさは変わらないのに呼んでいた）が、メインウィンドウまでのレイアウトを走らせ、
+  下段の何百ものキーを含むウィンドウ全体を描き直していた。
+- 透けない地なのに、影から地を切り抜く処理（パスの引き算、遅い）を毎回していた。
+- 描き直しの間（〜250 ms）にスライドの時間が過ぎ、四角は始点から終点へ飛んでいた。
+
+### 対策
+
+| 対策 | 内容 |
+|---|---|
+| 大きさが変わらないなら `updateGeometry()` しない | `KeyboardWidget.update_layout()` は大きさが変わったときだけ。`show_layer_keys()` は呼ばない |
+| 透けない地では影の切り抜きをしない | `key_style.paint_shadow()` と `LayerHighlight` の全ボタンの合成は `KEY_FACE_OPACITY < 1` のときだけ |
+| スライドはキーマップを描き終えてから始める | `switch_layer()`: ボタンの状態をすぐ切り替え、四角は行き先だけ決める（`move_to(..., later=True)`）。キーマップを書き換え、`KeyboardWidget.after_paint` で描き終えた直後に `start_slide()`。描き直されない（非表示）ときのために 300 ms 後の予備も置く |
+| 1 コマ分先から始める | `start_slide()` は `SLIDE_START_MS = 16` 進めた所から始め、キーマップの次の描画で四角がもう動いている |
+| 速く動き出すイージング | OutCubic（InOutCubic では出だしが遅く、遅れて見えた） |
+
+修正後: キーマップの描き直しは 1 回（約 140 ms、59〜202 ms）、四角は 212 ms に 0.36 まで動いた状態で描かれ、
+そこから 2.00 まで 12 コマでスライドする（新しいキーマップと四角の動き出しの差は約 10 ms）。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant K as KeymapEditor
+    participant W as KeyboardWidget
+    participant H as LayerHighlight
+    U->>K: レイヤーボタンを押す
+    K->>H: move_to(新しいレイヤー, later=True)（行き先だけ）
+    K->>W: show_layer_keys()（凡例の書き換え）
+    W->>W: paintEvent（約 140 ms）
+    W-->>H: after_paint → start_slide()（16 ms 先から）
+    Note over W,H: 次の描画で四角はもう動いていて、そのまま 250 ms でスライド
+```
+
+| テスト | 確認内容 |
+|---|---|
+| `test_ui_motion.py::test_layer_highlight_slides` | スライドが走り（OutCubic、150〜400 ms、65 ms で 40% 以上）、途中を通って目的のレイヤーに止まる |
+| `test_ui_motion.py::test_layer_switch_slides_once_the_keymap_shows` | 押した直後にボタンとキーマップは新しいレイヤー、スライドはまだ。キーマップの描画の後で始まり、目的のレイヤーに止まる |
+| `test_ui_motion.py::test_layer_slide_starts_without_a_keymap_paint` | キーマップが描き直されなくても、少し後にスライドする |
+| `test_ui_motion.py::test_layer_slide_starts_one_frame_in` | `start_slide()` の直後にもう途中の位置にいる |
+| `test_ui_motion.py::test_layer_switch_repaints_only_the_keymap_area` | レイヤー切り替えでメインウィンドウまでのレイアウトが走らず、下段のピッカーも描き直さない |
+| `test_dark_keys.py::test_shadow_clipped_only_under_translucent_faces` | 透けない地では影の切り抜きをしない |

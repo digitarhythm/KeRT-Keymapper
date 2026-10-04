@@ -7,18 +7,23 @@
     <script src="kert-serviceworker.js"></script>
     <link rel="icon" href="icon.png" type="image/png">
 <style>
-/* highlight colours: the same as the app's KeRT Light palette (branding_theme.py, Highlight / HighlightedText) */
+/* the app's KeRT Color palette (branding_theme.py: a copy of Arc since 2026-10-04) and key look (key_style.py) */
 :root {
-    --kert-highlight: #f0f0f0;
-    --kert-highlight-hover: #ffffff;
-    --kert-highlight-text: #1f2328;
-    --kert-window: #f5f6f8;      /* the app's window background (QPalette.Window) */
+    --kert-highlight: #5294e2;          /* QPalette.Highlight */
+    --kert-highlight-hover: #6aa3e8;    /* a lighter highlight under the mouse */
+    --kert-highlight-text: #d3dae3;     /* QPalette.HighlightedText */
+    --kert-window: #353945;             /* QPalette.Window */
+    --kert-text: #d3dae3;               /* QPalette.WindowText */
+    --kert-border: #2b2e39;             /* QPalette.Mid: the outlines of the boxes */
+    --kert-key: #c0c0c0;                /* key_style.KEY_FACE */
+    --kert-key-text: #1f2328;           /* key_style.KEY_LEGEND */
+    --kert-key-hover: #b0b0b0;          /* key_style.KEY_HOVER_FACE */
 }
 body {
     font-family: sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #ccc;
+    background-color: var(--kert-window);     /* the app's window colour (upstream's #ccc before) */
     overscroll-behavior-y: none;
 }
 #canvas {
@@ -54,8 +59,8 @@ body {
 }
 #startup_inner {
     position: relative;     /* the big spinner is centred on this card */
-    background-color: #f5f6f8;
-    border: 3px solid #303030;
+    background-color: var(--kert-window);
+    border: 3px solid var(--kert-border);
     border-radius: 10px;
     padding: 1.5em 2.5em;
 }
@@ -64,9 +69,9 @@ body {
     margin: 0 auto 1.5em auto;
     font-size: 120%;
     line-height: 1.6;
-    color: #1f2328;
+    color: var(--kert-text);
 }
-/* the start button looks like the cards inside the app: 10px corners, 3px #303030 frame, highlight grey */
+/* the start button looks like the cards inside the app: 10px corners, 3px outline, the highlight colour */
 .startup_btn {
     font-size: 140%;
     padding: 0.4em 1.2em;
@@ -76,7 +81,7 @@ body {
     font-family: inherit;
     color: var(--kert-highlight-text);
     background-color: var(--kert-highlight);
-    border: 3px solid #303030;
+    border: 3px solid var(--kert-border);
     border-radius: 10px;
     cursor: pointer;
 }
@@ -113,7 +118,7 @@ body {
 #known_title {
     font-size: 16pt;
     margin: 0 0 0.2em 0;
-    color: #1f2328;
+    color: var(--kert-text);
 }
 #known_list {
     display: flex;
@@ -125,29 +130,29 @@ body {
     min-width: 12em;
     padding: 0.4em 1.4em;
     line-height: normal;
-    border: 3px solid #303030;
+    border: 3px solid var(--kert-border);
     border-radius: 10px;
-    background-color: #000000;     /* black like the app's keys (2026-10-01) */
+    background-color: var(--kert-key);     /* like the app's keys (white since 2026-10-04, black before) */
     font-size: 140%;   /* the same size as the buttons (.startup_btn) */
     font-weight: bold;
     font-family: inherit;
     text-align: center;
-    color: #ffffff;
+    color: var(--kert-key-text);
     cursor: pointer;
 }
 .known_name:hover:enabled {
-    background-color: #333333;
+    background-color: var(--kert-key-hover);
 }
 /* while one keyboard connects, the others nearly vanish */
 .known_name:disabled {
     cursor: default;
     opacity: 0.1;
 }
-/* the keyboard being connected: white with a black name, at full opacity (the spinner is the big one
-   over the card, #big_spinner) */
+/* the keyboard being connected: the highlight colour, at full opacity (the spinner is the big one over
+   the card, #big_spinner) */
 .known_name.selected, .known_name.selected:disabled {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: var(--kert-highlight);
+    color: var(--kert-highlight-text);
     opacity: 1;
 }
 /* large loading spinner centred over the selection card while a chosen keyboard connects and starts */
@@ -160,10 +165,10 @@ body {
     height: 5em;
     margin: -2.5em 0 0 -2.5em;
     box-sizing: border-box;
-    border: 8px solid rgba(48, 48, 48, 0.25);
-    border-top-color: #303030;
+    border: 8px solid rgba(211, 218, 227, 0.25);
+    border-top-color: var(--kert-text);
     border-radius: 50%;
-    background-color: rgba(245, 246, 248, 0.7);
+    background-color: rgba(53, 57, 69, 0.7);
     animation: kert-spin 0.8s linear infinite;
     pointer-events: none;
 }
@@ -183,9 +188,9 @@ body {
 #progress_bar {
     position: relative;
     height: 1.6em;
-    border: 3px solid #303030;
+    border: 3px solid var(--kert-border);
     border-radius: 10px;
-    background-color: #ffffff;
+    background-color: var(--kert-key);
     overflow: hidden;
 }
 #progress_fill {
@@ -194,11 +199,11 @@ body {
     top: 0;
     bottom: 0;
     width: 0;
-    background-color: #000000;      /* black, like the keys (the highlight grey barely shows on white) */
+    background-color: var(--kert-highlight);      /* the highlight blue (2026-10-04; black before) */
     transition: width 0.3s ease-out;
 }
-/* the percentage in the bar: a black copy over the whole bar, and on top a white copy clipped to the
-   filled (black) part, so the digits are black on white and white on black, even across the edge */
+/* the percentage in the bar: a dark copy over the whole bar, and on top a light copy clipped to the
+   filled part, so the digits are dark on the white track and light on the fill, even across the edge */
 .progress_text {
     position: absolute;
     left: 0;
@@ -213,16 +218,16 @@ body {
     pointer-events: none;
 }
 #progress_text_dark {
-    color: #000000;
+    color: var(--kert-key-text);
 }
 #progress_text_light {
-    color: #ffffff;
+    color: var(--kert-highlight-text);
     clip-path: inset(0 100% 0 0);
     transition: clip-path 0.3s ease-out;
 }
 #progress_label {
     font-size: 100%;
-    color: #1f2328;
+    color: var(--kert-text);
     text-align: center;
 }
 /* loading spinner shown inside the button while the app starts */
@@ -230,7 +235,7 @@ body {
     display: none;
     width: 1em;
     height: 1em;
-    border: 3px solid rgba(31, 35, 40, 0.25);
+    border: 3px solid rgba(211, 218, 227, 0.25);
     border-top-color: var(--kert-highlight-text);
     border-radius: 50%;
     animation: kert-spin 0.8s linear infinite;
@@ -446,6 +451,11 @@ body {
         if (/[?&]debug=motion\b/.test(location.search)) ENV.KERT_DEBUG_MOTION = "1";
         // ?debug=startup: start-up step times and a profile of the "Finishing" stretch (webmain.py)
         if (/[?&]debug=startup\b/.test(location.search)) ENV.KERT_DEBUG_STARTUP = "1";
+        // the theme chosen in the app's Theme menu last time (branding_theme.saved_theme)
+        try {
+            var theme = localStorage.getItem("kert_theme");
+            if (theme) ENV.KERT_THEME = theme;
+        } catch (ex) {}
     }];
     Module.canvas = document.getElementById("canvas");
     Module.qtCanvasElements = [Module.canvas];
@@ -544,6 +554,11 @@ body {
             progress_step(e.data.step, e.data.done, e.data.total);
         } else if (e.data.cmd == "fade") {
             page_fade(e.data);
+        } else if (e.data.cmd == "theme") {
+            // Theme menu: Qt keeps its settings in memory only here, so the page keeps the choice
+            try {
+                localStorage.setItem("kert_theme", e.data.name);
+            } catch (ex) {}
         } else if (e.data.cmd == "fatal_error") {
             // shown on the page (no blocking alert); the start controls come back so the user can retry
             set_state("", false);

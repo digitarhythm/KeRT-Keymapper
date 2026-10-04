@@ -127,6 +127,7 @@ class KeymapEditor(BasicEditor):
         self.keyboard_area = w
         # the highlight box behind the layer buttons, sliding between layers
         self.layer_highlight = LayerHighlight(w)
+        self.shown_layer = 0        # the layer the keymap shows
         self.row = row
         self.layer_column = layer_column
         self.size_column = size_column
@@ -348,24 +349,41 @@ class KeymapEditor(BasicEditor):
 
     def refresh_layer_display(self):
         """ Refresh text on key widgets to display data corresponding to current layer """
+        self.update_layer_buttons()
+        self.show_layer_keys()
 
-        self.container.update_layout()
-
+    def update_layer_buttons(self, slide_later=False):
+        """The layer buttons' state and the highlight's slide to the current layer (slide_later: aim only;
+        the caller starts the slide)"""
         for idx, btn in enumerate(self.layer_buttons):
             btn.setEnabled(idx != self.current_layer)
             btn.setChecked(idx == self.current_layer)
-        self.layer_highlight.move_to(self.current_layer)
+        self.layer_highlight.move_to(self.current_layer, later=slide_later)
 
+    def show_layer_keys(self):
+        """The keymap's legends for the current layer"""
+        self.container.update_layout()
         for widget in self.container.widgets:
             code = self.code_for_widget(widget)
             KeycodeDisplay.display_keycode(widget, code)
-        self.container.update()
-        self.container.updateGeometry()
+        self.container.update()        # its size does not change with the layer: no updateGeometry()
+        self.shown_layer = self.current_layer
 
     def switch_layer(self, idx):
         self.container.deselect()
         self.current_layer = idx
-        self.refresh_layer_display()
+        # the keymap is rewritten at once and the highlight's slide starts when the new keymap has been
+        # painted: that paint takes ~120 ms in the browser and a slide started before it showed up halfway
+        # (or already finished); a fallback starts it anyway if the keymap is not repainted
+        self.update_layer_buttons(slide_later=True)
+        self.show_layer_keys()
+        hl = self.layer_highlight
+        if hl.slide_pending:
+            if self.container.isVisible():
+                self.container.after_paint = hl.start_slide
+                QTimer.singleShot(300, hl.start_slide)
+            else:
+                hl.start_slide()
 
     def set_key(self, keycode):
         """ Change currently selected key to provided keycode """

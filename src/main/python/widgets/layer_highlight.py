@@ -14,7 +14,11 @@ from PyQt5.QtWidgets import QApplication, QWidget
 
 import key_style
 
+# the highlight's slide to the chosen layer; 0 = it jumps there (tried on 2026-10-04, back to the slide,
+# now started together with the keymap's rewrite: KeymapEditor.switch_layer)
 SLIDE_MS = 250
+# start_slide() starts this far in (one frame), so the first paint after the keymap's shows the box moving
+SLIDE_START_MS = 16
 
 
 class LayerHighlight(QWidget):
@@ -27,8 +31,11 @@ class LayerHighlight(QWidget):
         self._slide = 0.0
         self.animation = QPropertyAnimation(self, b"slide", self)
         self.animation.setDuration(SLIDE_MS)
-        self.animation.setEasingCurve(QEasingCurve.InOutCubic)
-        # hover: the button under the mouse grows HOVER_GROW_PX per side with an orange frame, like the
+        self.slide_pending = False
+        # fast start, slow finish: in the browser the first frame after a click comes ~65 ms later (with the
+        # rewritten keymap); an ease-in start left the box still in place there, so it looked late
+        self.animation.setEasingCurve(QEasingCurve.OutCubic)
+        # hover: the button under the mouse grows HOVER_GROW_PX per side with a white frame, like the
         # keymap's keys (KeyboardWidget.enable_hover_zoom); per-button progress 0..1, HOVER_ANIM_MS
         self.hover_index = None
         self.zoom = {}
@@ -69,23 +76,39 @@ class LayerHighlight(QWidget):
         self.set_slide(0.0)
         self.sync_geometry()
 
-    def move_to(self, index):
-        """Slide to layer `index`; jumps when nothing is on screen to see it"""
+    def move_to(self, index, later=False):
+        """Slide to layer `index`; jumps when nothing is on screen to see it. later: only aim at it, the
+        slide starts with start_slide() (KeymapEditor.switch_layer: once the new keymap is painted)"""
         if not self.buttons:
             return
         index = max(0, min(index, len(self.buttons) - 1))
-        if index == self.target and self.animation.state() != QPropertyAnimation.Running:
+        if index == self.target and self.animation.state() != QPropertyAnimation.Running and not self.slide_pending:
             if self._slide != index:
                 self.set_slide(float(index))
             return
         self.target = index
         self.animation.stop()
-        if not self.isVisible():
+        if not self.isVisible() or SLIDE_MS <= 0:
+            self.slide_pending = False
             self.set_slide(float(index))
             return
+        self.slide_pending = True
+        if not later:
+            self.start_slide()
+
+    def start_slide(self):
+        """Start the slide aimed at by move_to(..., later=True), from where the box is now"""
+        if not self.slide_pending:
+            return
+        self.slide_pending = False
+        if not self.isVisible():
+            self.set_slide(float(self.target))
+            return
+        self.animation.stop()
         self.animation.setStartValue(self._slide)
-        self.animation.setEndValue(float(index))
+        self.animation.setEndValue(float(self.target))
         self.animation.start()
+        self.animation.setCurrentTime(min(SLIDE_START_MS, SLIDE_MS))
 
     # --- geometry: cover the buttons, stay below them
 
@@ -100,6 +123,11 @@ class LayerHighlight(QWidget):
 
     # --- hover zoom
 
+    def paint_order(self):
+        """Button indexes in drawing order: the zoomed ones last, the most zoomed on top, and the one under
+        the mouse the very last, also while the one it left is still bigger"""
+        return sorted(range(len(self.buttons)), key=lambda i: (i == self.hover_index, self.zoom.get(i, 0.0)))
+
     def zoom_progress(self, index):
         return self.zoom.get(index, 0.0)
 
@@ -108,33 +136,25 @@ class LayerHighlight(QWidget):
         t = self.zoom.get(index, 0.0)
         return key_style.HOVER_GROW_PX * t * t * (3 - 2 * t)
 
-    def update_hovered_labels(self):
-        """A button more than half way to white gets a dark label (stylesheet: [hovered="true"])"""
-        for i, b in enumerate(self.buttons):
-            try:
-                t = self.zoom.get(i, 0.0)
-                want = t * t * (3 - 2 * t) >= 0.5
-                if bool(b.property("hovered")) != want:
-                    b.setProperty("hovered", want)
-                    b.style().unpolish(b)
-                    b.style().polish(b)
-                    b.update()
-            except RuntimeError:
-                pass
-
     def set_hover(self, index):
         if index == self.hover_index:
             return
         self.hover_index = index
         if index is not None:
             self.zoom.setdefault(index, 0.0)
+        if key_style.HOVER_ANIM_MS <= 0:
+            self.step_zoom()             # no animation: one step to the end, no timer
+            return
         if not self.zoom_timer.isActive():
             self.zoom_clock.start()
             self.zoom_timer.start()
         self.step_zoom()
 
     def step_zoom(self):
-        step = self.zoom_clock.restart() / max(1, key_style.HOVER_ANIM_MS)
+        if key_style.HOVER_ANIM_MS <= 0:
+            step = 1.0
+        else:
+            step = self.zoom_clock.restart() / max(1, key_style.HOVER_ANIM_MS)
         for i in list(self.zoom):
             target = 1.0 if i == self.hover_index else 0.0
             p = self.zoom[i]
@@ -143,7 +163,6 @@ class LayerHighlight(QWidget):
                 del self.zoom[i]
             else:
                 self.zoom[i] = p
-        self.update_hovered_labels()
         if all(v == (1.0 if i == self.hover_index else 0.0) for i, v in self.zoom.items()):
             self.zoom_timer.stop()
         self.update()
@@ -220,27 +239,39 @@ class LayerHighlight(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         p.setPen(Qt.NoPen)
         # the buttons' own faces (they are transparent so the box can show through them); in the dark
-        # key look black, with the keys' drop shadow under them all first. A hovered button's face is grown
-        # and drawn last, so it covers its neighbours
+        # key look, with the keys' drop shadow under them all first. A hovered button's face is grown and
+        # drawn last, so it covers its neighbours, and after the highlight box unless it is the box's button
         n = len(self.buttons)
-        order = sorted(range(n), key=lambda i: self.zoom.get(i, 0.0))
+        order = self.paint_order()
+        top = self.hover_index if self.hover_index is not None and self.zoom.get(self.hover_index, 0.0) > 0.0 \
+            else None
+        if top is not None and (abs(self._slide - top) < 1e-6 or top == self.target):
+            # the current layer (the box grows with it) or the box's destination (the clicked button: the
+            # sliding box stays on top of it instead of going under it)
+            top = None
         faces = {i: self.button_rect(i).adjusted(-self.grow(i), -self.grow(i), self.grow(i), self.grow(i))
                  for i in range(n)}
         if key_style.DARK_KEYS:
             r = key_style.KEY_RADIUS
+            # translucent faces: no shadow under any of them (a button's shadow reaches the next one);
+            # opaque ones cover it anyway, and the path union is slow
+            all_faces = None
+            if key_style.KEY_FACE_OPACITY < 1.0:
+                all_faces = QPainterPath()
+                for f in faces.values():
+                    all_faces.addRoundedRect(f, r, r)
+                all_faces = all_faces.simplified()
             for i in order:
-                key_style.paint_shadow(p, lambda painter, f=faces[i]: painter.drawRoundedRect(f, r, r))
+                key_style.paint_shadow(p, lambda painter, f=faces[i]: painter.drawRoundedRect(f, r, r),
+                                       exclude=all_faces)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(key_style.KEY_FACE))
+            p.setBrush(key_style.face_color())
         else:
             p.setBrush(pal.color(QPalette.Button))
+        face_brush = p.brush()
         for i in order:
-            if key_style.DARK_KEYS and self.zoom.get(i, 0.0) > 0.0:
-                # hovered: fading from the black face to white with the growth
-                t = self.zoom[i]
-                p.setBrush(key_style.mix(key_style.KEY_FACE, key_style.HOVER_FACE, t * t * (3 - 2 * t)))
-            elif key_style.DARK_KEYS:
-                p.setBrush(QColor(key_style.KEY_FACE))
+            if i == top:
+                continue
             path = QPainterPath()
             path.addRoundedRect(faces[i], r, r)
             p.drawPath(path)
@@ -254,5 +285,27 @@ class LayerHighlight(QWidget):
         path = QPainterPath()
         path.addRoundedRect(box.adjusted(-g, -g, g, g), r, r)
         p.drawPath(path)
-        # no orange frame here: it marks a selected key on the keymap only (2026-10-02)
+        if top is not None:
+            path = QPainterPath()
+            path.addRoundedRect(faces[top], r, r)
+            if key_style.DARK_KEYS:
+                # the faces are translucent: an opaque backdrop in the page colour first, so the buttons and
+                # the box under the grown one do not show through it and it reads as the top one
+                p.setBrush(self.palette().color(QPalette.Window))
+                p.drawPath(path)
+            p.setBrush(face_brush)
+            p.drawPath(path)
+        # a hovered button's white frame, fading in with the growth, like the keymap's hovered key (no orange
+        # frame here: it marks a selected key on the keymap only)
+        out = key_style.HOVER_FRAME_GAP + key_style.HOVER_FRAME_WIDTH / 2
+        for i in order:
+            t = self.zoom.get(i, 0.0)
+            if t <= 0.0:
+                continue
+            c = QColor(key_style.HOVER_RING_COLOR)
+            c.setAlphaF(t * t * (3 - 2 * t))
+            p.setPen(QPen(c, key_style.HOVER_FRAME_WIDTH))
+            p.setBrush(Qt.NoBrush)
+            p.drawRoundedRect(faces[i].adjusted(-out, -out, out, out), key_style.HOVER_FRAME_RADIUS,
+                              key_style.HOVER_FRAME_RADIUS)
         p.end()

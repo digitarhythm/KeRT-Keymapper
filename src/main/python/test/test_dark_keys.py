@@ -21,21 +21,50 @@ def contrast(a, b):
     return (la + 0.05) / (lb + 0.05)
 
 
+# what a face looks like on screen: KEY_FACE at KEY_FACE_OPACITY over the window or a white base (2026-10-04)
+FACE_BACKGROUNDS = ("#f5f6f8", "#ffffff", "#353945")      # the old light window, white, Arc's window
+
+
+def is_face(c, face=None):
+    import key_style
+    f = QColor(face or key_style.KEY_FACE)
+    a = key_style.KEY_FACE_OPACITY
+    for bg in map(QColor, FACE_BACKGROUNDS):
+        want = [round(x * a + y * (1 - a)) for x, y in ((f.red(), bg.red()), (f.green(), bg.green()), (f.blue(), bg.blue()))]
+        if all(abs(v - w) <= 3 for v, w in zip((c.red(), c.green(), c.blue()), want)):
+            return True
+    return False
+
+
 def themed():
     import branding_theme
     import themes
     branding_theme.register()
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
 
 
 def test_constants():
     import key_style
     assert key_style.DARK_KEYS is True
-    assert QColor(key_style.KEY_FACE) == QColor("#000000")
-    assert QColor(key_style.KEY_LEGEND) == QColor("#ffffff")
+    # silver #c0c0c0, opaque, with dark legends (2026-10-04; #f0f0f0, peach, white, pastel green at 0.8
+    # opacity and black before)
+    assert QColor(key_style.KEY_FACE) == QColor("#c0c0c0")
+    face = QColor(key_style.KEY_FACE)
+    assert key_style.KEY_FACE_OPACITY == 1.0
+    assert key_style.face_color().alpha() == 255 and key_style.face_color().rgb() == face.rgb()
+    assert key_style.face_css() == "rgba(192, 192, 192, 255)"
+    assert QColor(key_style.KEY_LEGEND) == QColor("#1f2328")
+    assert contrast(QColor(key_style.KEY_LEGEND), QColor(key_style.KEY_FACE)) >= 7, "legend reads on the face"
+    hover = QColor(key_style.KEY_HOVER_FACE)
+    assert hover != QColor(key_style.KEY_FACE) and hover.lightness() < QColor(key_style.KEY_FACE).lightness(), \
+        "a slightly deeper shade under the mouse (tabs, keyboard selector)"
+    mask = QColor(key_style.KEY_MASK_FACE)
+    assert abs(mask.lightness() - QColor(key_style.KEY_FACE).lightness()) >= 10, \
+        "the inner box of LT keys stands apart from the face"
+    assert contrast(hover, QColor(key_style.KEY_LEGEND)) >= 7
     assert key_style.KEY_RADIUS == 8
     assert key_style.key_corner() == 8
-    # a remapped legend (Colemak etc.) must read on black: not the dark Link blue
+    # a remapped legend (Colemak etc.) must read on the face
     assert contrast(key_style.override_color(), QColor(key_style.KEY_FACE)) >= 4.5
     assert contrast(QColor(key_style.KEY_MASK_FACE), QColor(key_style.KEY_LEGEND)) >= 4.5
 
@@ -58,17 +87,20 @@ def test_keymap_key_is_black_with_white_legend_and_shadow(qtbot):
     img = w.grab().toImage()
     r = key.rect
     inner = QColor(img.pixel(r.left() + r.width() // 4, r.top() + r.height() // 4))
-    assert inner == QColor(key_style.KEY_FACE)
+    assert is_face(inner)
     legend = [QColor(img.pixel(x, y)) for x in range(r.center().x() - 8, r.center().x() + 8)
               for y in range(r.center().y() - 8, r.center().y() + 8)]
-    assert any(c == QColor(key_style.KEY_LEGEND) for c in legend), "white legend"
+    assert any(c == QColor(key_style.KEY_LEGEND) for c in legend), "dark legend"
     # key.rect is in key coordinates; on screen the key sits at (shift_x, shift_y)
     x = int(key.shift_x) + r.center().x()
     top = int(key.shift_y) + r.top()
     bottom = int(key.shift_y) + r.bottom()
     # no outline: the face colour runs right up to the edge (no lighter or darker ring inside it)
     edge = [QColor(img.pixel(x, y)) for y in range(top + 1, top + 5)]
-    assert all(c == QColor(key_style.KEY_FACE) for c in edge)
+    assert all(is_face(c) for c in edge)
+    # the shadow is not drawn under the (translucent) face: the face's bottom rows are the plain face too
+    low = [QColor(img.pixel(x, y)) for y in range(bottom - 5, bottom - 1)]
+    assert all(is_face(c) for c in low), [c.name() for c in low]
     # the widget leaves room for the shadow below the key
     assert img.height() - 1 - bottom >= key_style.SHADOW_OFFSET + key_style.SHADOW_BLUR - 1
     # a soft shadow below the key: darker than the window background, lighter further down
@@ -103,7 +135,7 @@ def test_picker_key_buttons(qtbot):
     block = re.search(r'QPushButton\[keyButton="true"\]\s*\{([^}]*)\}', css)
     assert block
     b = block.group(1)
-    assert "background-color: %s" % key_style.KEY_FACE in b and "color: %s" % key_style.KEY_LEGEND in b
+    assert "background-color: %s" % key_style.face_css() in b and "color: %s" % key_style.KEY_LEGEND in b
     assert "border: none" in b and "border-radius: %dpx" % key_style.KEY_RADIUS in b and "margin:" in b
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
@@ -121,15 +153,17 @@ def test_picker_key_buttons(qtbot):
     img = win.grab().toImage().copy(tl.x(), tl.y(), btn.width(), btn.height())
     ml, mt, mr, mb = key_style.KEY_MARGINS
     # the face: black, well inside the margins and away from the legend
-    assert QColor(img.pixel(ml + 3, mt + 3)) == QColor(key_style.KEY_FACE)
+    assert is_face(QColor(img.pixel(ml + 3, mt + 3)))
     # the shadow in the bottom margin, under the middle of the key
     x = img.width() // 2
-    assert QColor(img.pixel(x, img.height() - mb - 1)) == QColor(key_style.KEY_FACE)     # last row of the face
+    # last rows of the face (the very last one has the shadow under its antialiased edge)
+    assert is_face(QColor(img.pixel(x, img.height() - mb - 2)))
     shade = [QColor(img.pixel(x, y)).lightness() for y in range(img.height() - mb, img.height())]
     # a shadow that fades out downwards (the first row mixes with the face's antialiased edge)
     darkest = shade.index(min(shade))
     assert 0 < min(shade) < 150 and darkest <= 1, shade
-    assert shade[darkest:] == sorted(shade[darkest:]) and shade[-1] > min(shade) + 60, shade
+    # fading out (the span is smaller on the dark Arc window than on the old light one)
+    assert shade[darkest:] == sorted(shade[darkest:]) and shade[-1] > min(shade) + 20, shade
 
 
 def test_off_switch_restores_the_outlined_look(qtbot, monkeypatch):
@@ -167,7 +201,7 @@ def test_tab_style(qtbot):
     css = QApplication.instance().styleSheet()
     tabs = re.findall(r'QTabBar::tab\s*\{([^}]*)\}', css)
     last = tabs[-1]           # the dark key rules come last and win
-    assert "background-color: %s" % key_style.KEY_FACE in last and "color: %s" % key_style.KEY_LEGEND in last
+    assert "background-color: %s" % key_style.face_css() in last and "color: %s" % key_style.KEY_LEGEND in last
     assert "border: none" in last and "border-radius: %dpx" % key_style.KEY_RADIUS in last and "margin:" in last
     sel = re.findall(r'QTabBar::tab:selected\s*\{([^}]*)\}', css)[-1]
     pal = QApplication.palette()
@@ -184,10 +218,10 @@ def test_tabs_black_with_shadow(qtbot):
     r = bar.tabRect(1)                      # not selected
     ml, mt, mr, mb = key_style.KEY_MARGINS
     face = QColor(img.pixel(r.left() + ml + 3, r.top() + mt + 3))
-    assert face == QColor(key_style.KEY_FACE)
+    assert is_face(face)
     x = r.center().x()
     shade = [QColor(img.pixel(x, y)).lightness() for y in range(r.bottom() - mb + 1, r.bottom() + 1)]
-    assert 0 < min(shade) < 150 and shade[-1] > min(shade) + 40, shade
+    assert 0 < min(shade) < 150 and shade[-1] > min(shade) + 20, shade
     sel = bar.tabRect(0)
     assert QColor(img.pixel(sel.left() + ml + 3, sel.top() + mt + 3)) == QApplication.palette().color(QPalette.Highlight)
 
@@ -205,16 +239,18 @@ def test_layer_buttons_black_with_shadow(qtbot):
     def at(btn, dx, dy):
         p = btn.mapTo(parent, btn.rect().topLeft())
         return QColor(img.pixel(p.x() + dx, p.y() + dy))
-    assert at(buttons[1], 4, 4) == QColor(key_style.KEY_FACE)           # another layer: black face
+    assert is_face(at(buttons[1], 4, 4))           # another layer: black face
     assert at(buttons[0], 4, 4) == pal.color(QPalette.Highlight)       # the current layer: highlight
     # its label is dark on the light highlight (the current layer's button is disabled: that state must
     # not bring back the white legend)
     b0 = buttons[0]
-    label = [at(b0, x, y).lightness() for x in range(b0.width() // 2 - 6, b0.width() // 2 + 6)
+    label = [at(b0, x, y) for x in range(b0.width() // 2 - 6, b0.width() // 2 + 6)
              for y in range(b0.height() // 2 - 6, b0.height() // 2 + 6)]
-    assert min(label) < 100, "dark label on the current layer"
+    hlt = pal.color(QPalette.HighlightedText)
+    assert any(abs(c.lightness() - hlt.lightness()) < 25 and c != pal.color(QPalette.Highlight) for c in label), \
+        "the current layer's label in the highlighted-text colour"
     # no outline: the face runs right up to the edge
-    assert at(buttons[1], buttons[1].width() // 2, 1) == QColor(key_style.KEY_FACE)
+    assert is_face(at(buttons[1], buttons[1].width() // 2, 1))
     # a shadow under the last button, inside the highlight's area (it covers the shadow margins too)
     last = buttons[-1]
     below = [at(last, last.width() // 2, last.height() + k).lightness() for k in range(0, 5)]
@@ -239,18 +275,18 @@ def test_selector_looks_like_a_key(qtbot):
     block = re.findall(r'DeviceComboBox\s*\{([^}]*)\}', css)
     assert block, "selector rule"
     b = block[-1]
-    assert "background-color: %s" % key_style.KEY_FACE in b and "border: none" in b
+    assert "background-color: %s" % key_style.face_css() in b and "border: none" in b
     assert "border-radius: %dpx" % key_style.KEY_RADIUS in b and "margin:" in b
     img = shot(cb)
     ml, mt, mr, mb = key_style.KEY_MARGINS
-    assert QColor(img.pixel(ml + 3, cb.height() // 2)) == QColor(key_style.KEY_FACE)      # left of the text
+    assert is_face(QColor(img.pixel(ml + 3, cb.height() // 2)))      # left of the text
     text = cb.text_area()
     names = [QColor(img.pixel(x, y)) for x in range(text.left(), min(text.right(), text.left() + 120))
              for y in range(text.top(), text.bottom())]
-    assert any(c.lightness() > 230 for c in names), "white keyboard name"
+    assert any(c == QColor(key_style.KEY_LEGEND) for c in names), "keyboard name in the legend colour"
     x = cb.width() // 2
     shade = [QColor(img.pixel(x, y)).lightness() for y in range(cb.height() - mb, cb.height())]
-    assert 0 < min(shade) < 150 and shade[-1] > min(shade) + 40, shade
+    assert 0 < min(shade) < 150 and shade[-1] > min(shade) + 20, shade
 
 
 def test_zoom_buttons_look_like_keys(qtbot):
@@ -263,4 +299,31 @@ def test_zoom_buttons_look_like_keys(qtbot):
     img = shot(zoom[0])
     ml, mt, mr, mb = key_style.KEY_MARGINS
     # left edge, half way down: inside the face, clear of the rounded corners and of the +/- sign
-    assert QColor(img.pixel(ml + 2, img.height() // 2)) == QColor(key_style.KEY_FACE)
+    assert is_face(QColor(img.pixel(ml + 2, img.height() // 2)))
+
+
+def test_shadow_clipped_only_under_translucent_faces(qtbot, monkeypatch):
+    """Cutting the face out of its shadow (path subtraction: slow, ~1/3 of a layer switch's time on the
+    desktop and more in the browser) is only needed while the faces are translucent"""
+    import key_style
+    from PyQt5.QtCore import QRectF
+
+    class Recorder:
+        def __init__(self):
+            self.clips = 0
+
+        def __getattr__(self, name):
+            return lambda *a, **k: None
+
+        def setClipPath(self, *a):
+            self.clips += 1
+
+    face = QRectF(0, 0, 40, 40)
+    opaque = Recorder()
+    monkeypatch.setattr(key_style, "KEY_FACE_OPACITY", 1.0)
+    key_style.paint_shadow(opaque, lambda p: p.drawRoundedRect(face, 8, 8))
+    assert opaque.clips == 0
+    translucent = Recorder()
+    monkeypatch.setattr(key_style, "KEY_FACE_OPACITY", 0.8)
+    key_style.paint_shadow(translucent, lambda p: p.drawRoundedRect(face, 8, 8))
+    assert translucent.clips == 1

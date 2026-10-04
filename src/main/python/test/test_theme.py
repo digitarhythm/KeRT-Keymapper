@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Branding theme (KeRT Light) and flat key rendering."""
+"""Branding theme (KeRT Color) and flat key rendering."""
 import sys
 
 import pytest
@@ -9,74 +9,153 @@ from PyQt5.QtWidgets import QApplication
 sys.path.insert(0, __import__("os").path.dirname(__file__))
 
 
-def test_kert_light_registered(qtbot):
+UPSTREAM = ["Light", "Dark", "Arc", "Nord", "Olivia", "Dracula", "Bliss", "Catppuccin Latte",
+            "Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha"]
+
+
+def test_kert_color_registered(qtbot):
     import branding_theme
     import themes
 
     branding_theme.register()
-    assert "KeRT Light" in themes.palettes
-    assert "KeRT Light" in [name for name, _ in themes.themes]
+    assert branding_theme.DEFAULT_THEME == "KeRT Color"
+    assert "KeRT Color" in themes.palettes
+    assert "KeRT Light" not in themes.palettes, "renamed to KeRT Color (2026-10-04)"
     # registering twice must not duplicate the menu entry
     branding_theme.register()
-    assert [name for name, _ in themes.themes].count("KeRT Light") == 1
+    assert [name for name, _ in themes.themes].count("KeRT Color") == 1
 
-    pal = themes.palettes["KeRT Light"]
-    assert pal.color(QPalette.Window).lightness() > 230
-    assert pal.color(QPalette.Mid) == QColor("#303030")        # dark outlines and borders
-    assert pal.color(QPalette.Button) == QColor("#ffffff")
-    assert pal.color(QPalette.ButtonText).lightness() < 80
+    # rebuilt as a copy of upstream's Arc (2026-10-04): every colour Arc sets, plus the outline colour
+    # (Mid) the KeRT stylesheet draws its boxes with, which Arc leaves unset
+    pal = themes.palettes["KeRT Color"]
+    arc = dict(themes.themes)["Arc"]
+    for role, colour in arc.items():
+        args = role if isinstance(role, tuple) else (role,)
+        assert pal.color(*args) == QColor(colour), role
+    assert pal.color(QPalette.Mid) == QColor(branding_theme.KERT_OUTLINE)
+    assert dict(branding_theme.BRAND_THEMES)["KeRT Color"][QPalette.Mid] == branding_theme.KERT_OUTLINE
 
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     try:
-        assert themes.Theme.mask_light_factor() == 103
+        assert themes.Theme.mask_light_factor() == 150, "a dark theme now, like Arc"
     finally:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
 
 
-def test_only_kert_light(qtbot):
-    """ KeRT Light is the one and only theme: nothing else is registered and there is no Theme menu """
+def test_upstream_themes_are_back(qtbot):
+    """ The Theme menu is back (2026-10-04): KeRT Color first, then upstream's themes """
     import branding_theme
     import themes
-    from test_gui import prepare, FAKE_KEYBOARD
 
     branding_theme.register()
-    assert [name for name, _ in themes.themes] == ["KeRT Light"]
-    assert set(themes.palettes) == {"KeRT Light"}
+    assert [name for name, _ in themes.themes] == ["KeRT Color"] + UPSTREAM
+    assert set(themes.palettes) == {"KeRT Color"} | set(UPSTREAM)
+
+
+def test_theme_menu_visible(qtbot):
+    """ The Theme menu shows System, KeRT Color and upstream's themes; KeRT Color is checked by default """
+    from test_gui import prepare, FAKE_KEYBOARD
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
-    assert not mw.theme_menu.menuAction().isVisible()
-    assert mw.get_theme() == "KeRT Light"
+    assert mw.theme_menu.menuAction().isVisible()
+    names = [a.data() for a in mw.theme_menu.actions()]
+    assert names == ["System", "KeRT Color"] + UPSTREAM
+    checked = [a.data() for a in mw.theme_menu.actions() if a.isChecked()]
+    assert checked == [mw.get_theme()]
+
+
+class FakeSettings:
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+
+    def value(self, key, default=None):
+        return self.values.get(key, default)
+
+    def setValue(self, key, value):
+        self.values[key] = value
 
 
 def test_default_theme_resolution(qtbot):
-    """ A saved upstream theme name (from before the rebranding) falls back to KeRT Light """
+    """ Nothing saved, an unknown name or the old "KeRT Color" give KeRT Color; a known theme is kept """
     import branding_theme
 
-    for saved in (None, "Dark", "Bliss", "System", "KeRT Light"):
-        assert branding_theme.resolve_theme(saved) == "KeRT Light"
+    branding_theme.register()
+    for saved in (None, "", "Nope", "KeRT Light", "KeRT Color"):
+        assert branding_theme.resolve_theme(saved) == "KeRT Color", saved
+    for saved in ["System"] + UPSTREAM:
+        assert branding_theme.resolve_theme(saved) == saved
 
 
-def test_widget_stylesheet(qtbot):
-    """ KeRT Light rounds every box by 10px with a 3px line; other themes keep upstream's look """
+def test_theme_saved_under_its_own_key(qtbot):
+    """ The choice is kept under "kert_theme": a "theme" value left from before (when the menu was hidden
+    and upstream names could be saved) is ignored """
+    import branding_theme
+
+    settings = FakeSettings({"theme": "Dark"})
+    assert branding_theme.saved_theme(settings, web=False) == "KeRT Color"
+    branding_theme.save_theme(settings, "Nord", web=False)
+    assert settings.values["kert_theme"] == "Nord"
+    assert branding_theme.saved_theme(settings, web=False) == "Nord"
+
+
+def test_theme_saved_by_the_web_page(qtbot, monkeypatch):
+    """ Browser build: Qt keeps QSettings in memory only, so the page stores the choice (localStorage) and
+    hands it back as the KERT_THEME environment variable at the next start """
+    import types
+    import branding_theme
+
+    sent = []
+    monkeypatch.setitem(sys.modules, "vialglue", types.SimpleNamespace(save_theme=sent.append))
+    monkeypatch.delenv("KERT_THEME", raising=False)
+    settings = FakeSettings()
+    assert branding_theme.saved_theme(settings, web=True) == "KeRT Color"
+    monkeypatch.setenv("KERT_THEME", "Dracula")
+    assert branding_theme.saved_theme(settings, web=True) == "Dracula"
+    branding_theme.save_theme(settings, "Arc", web=True)
+    assert sent == ["Arc"] and settings.values == {}
+
+
+def test_upstream_theme_keeps_the_key_look(qtbot):
+    """ Upstream themes (and System) get no KeRT boxes, but the black keys, tabs and see-through layer
+    buttons stay: the keys are painted black whatever the theme """
     import branding_theme
     import themes
 
     branding_theme.register()
     app = QApplication.instance()
     try:
-        themes.Theme.set_theme("KeRT Light")
+        for name in ("Dark", "System"):
+            themes.Theme.set_theme(name)
+            css = app.styleSheet()
+            assert "3px solid #303030" not in css, name
+            assert 'QPushButton[keyButton="true"]' in css and 'QPushButton[layerButton="true"]' in css, name
+            assert "transparent" in css, name
+    finally:
+        themes.Theme.set_theme("KeRT Color")
+
+
+def test_widget_stylesheet(qtbot):
+    """ KeRT Color rounds every box by 10px with a 3px line; other themes keep upstream's look """
+    import branding_theme
+    import themes
+
+    branding_theme.register()
+    app = QApplication.instance()
+    try:
+        themes.Theme.set_theme("KeRT Color")
         css = app.styleSheet()
         assert "border-radius: 10px" in css
-        assert "3px solid #303030" in css
+        mid = dict(branding_theme.BRAND_THEMES)["KeRT Color"][QPalette.Mid]
+        assert "3px solid " + mid in css
         assert "QPushButton" in css and "QTabBar::tab" in css and "EntryCard" in css
         # the keyboard selector gets twice the usual left padding in front of the keyboard name
         assert "QComboBox {" in css and "padding-left: 32px" in css.split("QComboBox {")[1].split("}")[0]
         # checkboxes (QMK Settings) are drawn dark, filled with the brand colour when checked
-        assert "QCheckBox::indicator" in css and "2px solid #303030" in css
-        hl = dict(branding_theme.BRAND_THEMES)["KeRT Light"][QPalette.Highlight]
+        assert "QCheckBox::indicator" in css and "2px solid " + mid in css
+        hl = dict(branding_theme.BRAND_THEMES)["KeRT Color"][QPalette.Highlight]
         assert "QCheckBox::indicator:checked" in css and "background-color: " + hl in css.split("QCheckBox::indicator:checked")[1]
     finally:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
 
 
 
@@ -84,12 +163,12 @@ def test_widget_stylesheet(qtbot):
 def test_highlight_keeps_dark_outline(qtbot):
     """ Selected tab / checked button / checked box: only the fill shows the highlight, the dark outline stays """
     import branding_theme
-    theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
+    theme = dict(branding_theme.BRAND_THEMES)["KeRT Color"]
     # selected tab / checked button / checked box keep the dark outline: only the fill turns grey
     import re
     import themes
     branding_theme.register()
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     css = QApplication.instance().styleSheet()
     for selector in ("QTabBar::tab:selected", "QPushButton:checked", "QCheckBox::indicator:checked"):
         block = re.search(re.escape(selector) + r"[^{]*\{([^}]*)\}", css).group(1)
@@ -105,19 +184,19 @@ def test_selected_uses_background(qtbot):
     branding_theme.register()
     app = QApplication.instance()
     try:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
         css = app.styleSheet()
-        hl = dict(branding_theme.BRAND_THEMES)["KeRT Light"][QPalette.Highlight]
+        hl = dict(branding_theme.BRAND_THEMES)["KeRT Color"][QPalette.Highlight]
         for selector in ("QTabBar::tab:selected", "QPushButton:checked"):
             block = re.search(re.escape(selector) + r"[^{]*\{([^}]*)\}", css)
             assert block, selector
             assert "background-color: {}".format(hl) in block.group(1), selector
     finally:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
 
 
 def test_layout_spacing(qtbot):
-    """ KeRT Light packs widgets with 3px margins and spacing, the same as its line width """
+    """ KeRT Color packs widgets with 3px margins and spacing, the same as its line width """
     from PyQt5.QtWidgets import QStyle
     import branding_theme
     import themes
@@ -126,7 +205,7 @@ def test_layout_spacing(qtbot):
     app = QApplication.instance()
     metrics = (QStyle.PM_LayoutLeftMargin, QStyle.PM_LayoutTopMargin, QStyle.PM_LayoutRightMargin,
                QStyle.PM_LayoutBottomMargin, QStyle.PM_LayoutHorizontalSpacing, QStyle.PM_LayoutVerticalSpacing)
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     assert all(app.style().pixelMetric(m) == 3 for m in metrics)
 
 
@@ -157,8 +236,17 @@ def test_flat_key_paint(qtbot, monkeypatch):
     monkeypatch.setattr(key_style, "DARK_KEYS", False)
 
     branding_theme.register()
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     try:
+        # a palette of its own with a light key on a lighter window and a dark outline: this tests the
+        # outlined flat key's shape, and KeRT Color (Arc) has the same colour for keys and window
+        from PyQt5.QtGui import QPalette as P
+        pal = QApplication.palette()
+        pal.setColor(P.Button, QColor("#ffffff"))
+        pal.setColor(P.Window, QColor("#f5f6f8"))
+        pal.setColor(P.Mid, QColor("#303030"))
+        pal.setColor(P.ButtonText, QColor("#1f2328"))
+        QApplication.setPalette(pal)
         w = KeyWidget()
         w.set_keycode("KC_A")
         qtbot.addWidget(w)
@@ -180,7 +268,7 @@ def test_flat_key_paint(qtbot, monkeypatch):
         assert edge < pal.color(QPalette.Button).lightness() - 20
         assert edge < pal.color(QPalette.Window).lightness() - 20
     finally:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
 
 
 def test_selected_key_filled(qtbot, monkeypatch):
@@ -194,7 +282,7 @@ def test_selected_key_filled(qtbot, monkeypatch):
     monkeypatch.setattr(key_style, "DARK_KEYS", False)
 
     branding_theme.register()
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     try:
         w = KeyWidget()
         w.set_keycode("KC_A")
@@ -221,7 +309,7 @@ def test_selected_key_filled(qtbot, monkeypatch):
         edge = [QColor(img.pixel(r.center().x(), y)) for y in range(r.top(), r.top() + 6)]
         assert any(c == mid for c in edge), "selected key keeps the dark outline"
     finally:
-        themes.Theme.set_theme("KeRT Light")
+        themes.Theme.set_theme("KeRT Color")
 
 
 def test_device_combobox_size(qtbot):
@@ -487,7 +575,10 @@ def test_checkbox_check_mark(qtbot):
     path = checked_rule.split('url("')[1].split('"')[0]
     assert path.endswith("check.svg") and os.path.exists(path)
 
+    hl = QApplication.palette().color(QPalette.Highlight)
+
     def white_pixels(checked):
+        """(pixels of the highlight colour, pixels clearly darker than it - the mark), indicator rect"""
         box = QCheckBox("x", mw)
         box.setChecked(checked)
         box.resize(box.sizeHint())
@@ -498,17 +589,19 @@ def test_checkbox_check_mark(qtbot):
         ind = box.style().subElementRect(QStyle.SE_CheckBoxIndicator, opt, box)
         image = box.grab().toImage()
         inner = ind.adjusted(4, 4, -4, -4)
-        n = sum(1 for x in range(inner.left(), inner.right() + 1) for y in range(inner.top(), inner.bottom() + 1)
-                if QColor(image.pixel(x, y)).lightness() > 200)
+        pixels = [QColor(image.pixel(x, y)) for x in range(inner.left(), inner.right() + 1)
+                  for y in range(inner.top(), inner.bottom() + 1)]
+        filled = sum(1 for c in pixels if c == hl)
+        mark = sum(1 for c in pixels if c.lightness() < hl.lightness() - 60)
         box.hide()
-        return n, ind
+        return (filled, mark), ind
 
-    n_checked, ind = white_pixels(True)
-    n_unchecked, _ = white_pixels(False)
+    (filled, mark), ind = white_pixels(True)
+    (filled_off, _), _ = white_pixels(False)
     assert ind.width() >= 18
-    assert n_checked > 0
-    # unchecked: white background everywhere, checked: mostly brand colour with a white mark
-    assert n_checked < n_unchecked
+    # checked: the highlight colour with the (dark) check mark on it; unchecked: no highlight colour
+    assert filled > 0 and mark > 0
+    assert filled_off == 0
 
 
 def test_editor_tabs_centred(qtbot):
@@ -555,3 +648,20 @@ def test_inner_editor_tabs_centred(qtbot):
         assert abs(bar_centre - tabs.width() / 2) < tabs.width() * 0.05, label
         checked += 1
     assert checked >= 1     # the virtual test keyboard only has Macros of these
+
+
+def test_tabs_centred_in_every_theme(qtbot):
+    """ The tab bars are centred whatever the theme (2026-10-04: upstream themes and System too) """
+    import re
+    import branding_theme
+    import themes
+
+    branding_theme.register()
+    app = QApplication.instance()
+    try:
+        for name in ("KeRT Color", "Dark", "Nord", "System"):
+            themes.Theme.set_theme(name)
+            block = re.search(r"QTabWidget::tab-bar\s*\{([^}]*)\}", app.styleSheet())
+            assert block and "alignment: center" in block.group(1), name
+    finally:
+        themes.Theme.set_theme("KeRT Color")

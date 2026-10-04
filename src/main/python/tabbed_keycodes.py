@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
-from widgets import key_shadow
+from widgets import key_hover_overlay, key_shadow
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QTabWidget, QWidget, QScrollArea, QApplication, QVBoxLayout, QHBoxLayout, QSizePolicy, \
     QWIDGETSIZE_MAX
@@ -46,7 +46,9 @@ class AlternativeDisplay(QWidget):
         # everything is left-aligned inside one block; the block is as wide as the display keyboard
         # (full width when there is none) and centred in the tab page
         block_layout = QVBoxLayout()
-        block_layout.setContentsMargins(0, 0, 0, 0)
+        # room above and below the keys for the hovered key's growth and frame (widgets/key_hover_overlay.py)
+        m = key_hover_overlay.room()
+        block_layout.setContentsMargins(0, m, 0, m)
         if kbdef:
             self.kb_display = DisplayKeyboard(kbdef)
             self.kb_display.keycode_changed.connect(self.keycode_changed)
@@ -175,6 +177,8 @@ class AlternativeDisplay(QWidget):
 
         self.relabel_buttons()
         key_shadow.install_parent(self.block)   # shadows under the key buttons
+        # the key under the mouse grows, like the keymap's: painted over this page (past the block's edges)
+        key_hover_overlay.install(self)
         self.update_block_width()
 
     def relabel_buttons(self):

@@ -31,11 +31,15 @@ def test_highlight_light_with_dark_text(qtbot):
     import branding_theme
     import key_style
 
-    theme = dict(branding_theme.BRAND_THEMES)["KeRT Light"]
+    theme = dict(branding_theme.BRAND_THEMES)["KeRT Color"]
     hl, hlt = QColor(theme[QPalette.Highlight]), QColor(theme[QPalette.HighlightedText])
-    assert hl == QColor("#f0f0f0")
-    assert contrast(hl, hlt) >= 7, "dark text on it"
-    assert contrast(hl, QColor(key_style.KEY_FACE)) >= 7, "stands out from the black faces"
+    # KeRT Color rebuilt from Arc (2026-10-04): Arc's blue selection with its light text
+    assert hl == QColor("#5294e2") and hlt == QColor("#d3dae3")
+    face = QColor(key_style.KEY_FACE)
+    # the blue stands out from the grey keys by its hue (their lightness is close: ~1.75:1)
+    assert contrast(hl, face) >= 1.5
+    assert hl.blue() - hl.red() >= 100 and max(face.red(), face.green(), face.blue()) - min(
+        face.red(), face.green(), face.blue()) <= 10, "blue against a grey face"
     svg = open(os.path.join(os.path.dirname(__file__), "../../resources/base/check.svg"), encoding="utf-8").read()
     assert contrast(hl, QColor(svg.split('stroke="')[1].split('"')[0])) >= 4.5, "the check mark reads on it"
 
@@ -92,12 +96,15 @@ def test_layer_highlight_slides(qtbot):
     ke.switch_layer(2)
     assert hl.target == 2
     anim = hl.animation
-    assert anim.state() == QAbstractAnimation.Running
-    assert anim.easingCurve().type() in (QEasingCurve.InOutCubic, QEasingCurve.InOutQuad, QEasingCurve.InOutSine)
+    qtbot.waitUntil(lambda: anim.state() == QAbstractAnimation.Running, timeout=1000)
+    # fast start, slow finish (2026-10-04; ease in-out before): the box is visibly on its way in the first
+    # frame that shows the rewritten keymap (~65 ms later in the browser), not still at its old place
+    assert anim.easingCurve().type() == QEasingCurve.OutCubic
+    assert anim.easingCurve().valueForProgress(65 / anim.duration()) > 0.4
     assert 150 <= anim.duration() <= 400
     qtbot.waitUntil(lambda: 0 < hl.slide < 2, timeout=1000)        # on its way
     qtbot.waitUntil(lambda: anim.state() == QAbstractAnimation.Stopped and abs(hl.slide - 2) < 1e-6, timeout=2000)
-    # the button under the highlight has white text, the others dark
+    # the button under the highlight has the highlighted-text label, the others not
     assert [b.property("lit") for b in buttons] == [False, False, True, False]
 
 
@@ -120,7 +127,9 @@ def test_layer_highlight_rect_follows_button(qtbot):
     hl = ke.layer_highlight
     buttons = settled(qtbot, ke)
     ke.switch_layer(1)
-    qtbot.waitUntil(lambda: hl.animation.state() == QAbstractAnimation.Stopped, timeout=2000)
+    # the slide starts once the keymap has been painted: wait for it to arrive
+    qtbot.waitUntil(lambda: hl.animation.state() == QAbstractAnimation.Stopped and abs(hl.slide - 1) < 1e-6,
+                    timeout=2000)
     r = hl.indicator_rect()
     b = buttons[1]
     top_left = b.mapTo(hl.parentWidget(), b.rect().topLeft())
@@ -132,7 +141,7 @@ def test_layer_button_stylesheet(qtbot):
     import branding_theme
     import themes
     branding_theme.register()
-    themes.Theme.set_theme("KeRT Light")
+    themes.Theme.set_theme("KeRT Color")
     from PyQt5.QtWidgets import QApplication
     css = QApplication.instance().styleSheet()
     import re
@@ -246,3 +255,111 @@ def test_web_fade_uses_the_page_overlay(qtbot, monkeypatch):
     qtbot.waitUntil(lambda: any(c[0] == "in" for c in calls), timeout=1500)
     assert [c for c in calls if c[0] == "in"][0][-1] == tab_fade.FADE_IN_MS
     qtbot.waitUntil(lambda: not f.busy(), timeout=1500)
+
+
+def test_layer_switch_slides_once_the_keymap_shows(qtbot):
+    """Clicking a layer button rewrites the keymap at once and starts the highlight's slide when the new
+    keymap has been painted (2026-10-04): in the browser that paint takes ~120 ms, and a slide started
+    before it lost its first part (it showed up already halfway), or all of it"""
+    from PyQt5.QtCore import QEvent, QObject
+
+    mw = prepared(qtbot)
+    ke = mw.keymap_editor
+    hl = ke.layer_highlight
+    buttons = settled(qtbot, ke)
+    qtbot.wait(100)
+
+    class PaintSpy(QObject):
+        def __init__(self):
+            super().__init__()
+            self.paints = 0
+
+        def eventFilter(self, obj, ev):
+            if ev.type() == QEvent.Paint:
+                self.paints += 1
+            return False
+
+    spy = PaintSpy()
+    ke.container.installEventFilter(spy)
+    started = []
+    hl.animation.stateChanged.connect(
+        lambda new, old: started.append(spy.paints) if new == QAbstractAnimation.Running else None)
+    try:
+        ke.switch_layer(2)
+        assert buttons[2].isChecked() and hl.target == 2, "the buttons switch at once"
+        assert ke.shown_layer == 2, "the keymap is rewritten at once"
+        assert hl.animation.state() != QAbstractAnimation.Running, "the slide waits for the keymap's paint"
+        qtbot.waitUntil(lambda: hl.animation.state() == QAbstractAnimation.Stopped and abs(hl.slide - 2) < 1e-6,
+                        timeout=2000)
+    finally:
+        ke.container.removeEventFilter(spy)
+    assert started and started[0] >= 1, "started after the keymap had been painted"
+
+
+def test_layer_slide_starts_without_a_keymap_paint(qtbot):
+    """If the keymap is not repainted (hidden), the slide still starts, a moment later"""
+    mw = prepared(qtbot)
+    ke = mw.keymap_editor
+    hl = ke.layer_highlight
+    settled(qtbot, ke)
+    ke.container.hide()
+    try:
+        ke.switch_layer(1)
+        qtbot.waitUntil(lambda: abs(hl.slide - 1) < 1e-6, timeout=2000)
+    finally:
+        ke.container.show()
+
+
+def test_layer_switch_repaints_only_the_keymap_area(qtbot):
+    """A layer switch repaints the keymap and the layer column, not the whole window: the keymap keeps
+    its size, so it must not ask the layouts up to the main window to run again (2026-10-04: an
+    updateGeometry() did, and the whole window - hundreds of picker keys - was repainted, ~120 ms in the
+    browser, which ate the highlight's slide)"""
+    from PyQt5.QtCore import QEvent, QObject
+    from PyQt5.QtWidgets import QApplication
+    from tabbed_keycodes import TabbedKeycodes
+
+    mw = prepared(qtbot)
+    ke = mw.keymap_editor
+    settled(qtbot, ke)
+    qtbot.wait(300)
+
+    class Spy(QObject):
+        def __init__(self):
+            super().__init__()
+            self.layout_main = 0
+            self.picker_paints = 0
+
+        def eventFilter(self, obj, ev):
+            if ev.type() == QEvent.LayoutRequest and obj is mw:
+                self.layout_main += 1
+            elif ev.type() == QEvent.Paint and isinstance(obj, TabbedKeycodes):
+                self.picker_paints += 1
+            return False
+
+    spy = Spy()
+    QApplication.instance().installEventFilter(spy)
+    try:
+        ke.switch_layer(2)
+        qtbot.waitUntil(lambda: ke.layer_highlight.animation.state() == QAbstractAnimation.Stopped, timeout=2000)
+        qtbot.wait(50)
+    finally:
+        QApplication.instance().removeEventFilter(spy)
+    assert spy.layout_main == 0, "no layout run up to the main window"
+    assert spy.picker_paints == 0, "the picker below is not repainted"
+
+
+def test_layer_slide_starts_one_frame_in(qtbot):
+    """start_slide() starts the slide one frame (16 ms) in, so the first paint after the keymap's already
+    shows the box moving instead of still at its old place"""
+    from widgets.layer_highlight import SLIDE_START_MS
+    mw = prepared(qtbot)
+    ke = mw.keymap_editor
+    hl = ke.layer_highlight
+    settled(qtbot, ke)
+    assert SLIDE_START_MS == 16
+    hl.move_to(2, later=True)
+    assert hl.slide == 0.0 and hl.slide_pending
+    hl.start_slide()
+    assert hl.animation.currentTime() >= SLIDE_START_MS
+    assert 0.0 < hl.slide < 2.0, "already on its way"

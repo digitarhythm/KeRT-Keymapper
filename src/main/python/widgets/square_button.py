@@ -3,6 +3,8 @@
 from PyQt5.QtCore import QRectF, QSize, Qt
 from PyQt5.QtGui import QPainter
 import key_style
+from PyQt5 import sip
+from widgets import key_hover_overlay
 from PyQt5.QtWidgets import QPushButton, QLabel, QHBoxLayout, QApplication
 
 class SquareButton(QPushButton):
@@ -24,6 +26,32 @@ class SquareButton(QPushButton):
         buttons in one go (widgets/key_shadow.py, install_parent()) - a Python paintEvent per button was
         one of the bigger costs of the browser build's start-up"""
         self.setProperty("keyButton", True)
+
+    # hover like the keymap's keys: the overlay around the picker paints this key grown on top
+    # (widgets/key_hover_overlay.py); only these events run Python, not every event of every button
+    def enterEvent(self, ev):
+        super().enterEvent(ev)
+        overlay = key_hover_overlay.overlay_for(self)
+        if overlay is not None:
+            overlay.button_entered(self)
+
+    def leaveEvent(self, ev):
+        super().leaveEvent(ev)
+        overlay = key_hover_overlay.overlay_for(self)
+        if overlay is not None:
+            overlay.button_left(self)
+
+    def mousePressEvent(self, ev):
+        super().mousePressEvent(ev)
+        overlay = key_hover_overlay.overlay_for(self)
+        if overlay is not None:
+            overlay.button_changed(self)
+
+    def mouseReleaseEvent(self, ev):
+        super().mouseReleaseEvent(ev)
+        overlay = key_hover_overlay.overlay_for(self)
+        if overlay is not None and not sip.isdeleted(self):
+            overlay.button_changed(self)
 
     def setRelSize(self, ratio):
         self.scale = ratio

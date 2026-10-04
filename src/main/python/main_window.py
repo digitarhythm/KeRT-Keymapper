@@ -280,22 +280,21 @@ class MainWindow(QMainWindow):
         self.security_menu.addSeparator()
         self.security_menu.addAction(keyboard_reset_act)
 
-        if sys.platform != "emscripten":
-            self.theme_menu = self.menuBar().addMenu(tr("Menu", "Theme"))
-            theme_group = QActionGroup(self)
-            selected_theme = self.get_theme()
-            for name, _ in [("System", None)] + themes.themes:
-                act = QAction(tr("MenuTheme", name), self)
-                act.triggered.connect(lambda x,name=name: self.set_theme(name))
-                act.setCheckable(True)
-                act.setChecked(selected_theme == name)
-                theme_group.addAction(act)
-                self.theme_menu.addAction(act)
-            # check "System" if nothing else is selected
-            if theme_group.checkedAction() is None:
-                theme_group.actions()[0].setChecked(True)
-            # this fork ships a single theme, so there is nothing to choose from
-            self.theme_menu.menuAction().setVisible(False)
+        # the Theme menu, on the web too (2026-10-04; docs/theme-menu-spec.md)
+        self.theme_menu = self.menuBar().addMenu(tr("Menu", "Theme"))
+        theme_group = QActionGroup(self)
+        selected_theme = self.get_theme()
+        for name, _ in [("System", None)] + themes.themes:
+            act = QAction(tr("MenuTheme", name), self)
+            act.setData(name)
+            act.triggered.connect(lambda x,name=name: self.set_theme(name))
+            act.setCheckable(True)
+            act.setChecked(selected_theme == name)
+            theme_group.addAction(act)
+            self.theme_menu.addAction(act)
+        # check "System" if nothing else is selected
+        if theme_group.checkedAction() is None:
+            theme_group.actions()[0].setChecked(True)
 
         about_vial_act = QAction(tr("MenuAbout", "About {}...").format(branding.APP_NAME), self)
         about_vial_act.triggered.connect(self.about_vial)
@@ -512,12 +511,17 @@ class MainWindow(QMainWindow):
         KeycodeDisplay.set_keymap_override(KEYMAPS[index][1])
 
     def get_theme(self):
-        # a theme saved before the rebranding (an upstream name) falls back to this fork's default
-        return branding_theme.resolve_theme(self.settings.value("theme", None))
+        return branding_theme.saved_theme(self.settings)
 
     def set_theme(self, theme):
         themes.Theme.set_theme(theme)
-        self.settings.setValue("theme", theme)
+        branding_theme.save_theme(self.settings, theme)
+        if sys.platform == "emscripten":
+            # no nested event loop (exec_) in the browser build: shown without blocking
+            self.theme_message = QMessageBox(self)
+            self.theme_message.setText(tr("MainWindow", "In order to fully apply the theme you should reload the page."))
+            self.theme_message.open()
+            return
         msg = QMessageBox()
         msg.setText(tr("MainWindow", "In order to fully apply the theme you should restart the application."))
         msg.exec_()

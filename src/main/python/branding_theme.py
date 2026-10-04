@@ -2,40 +2,35 @@
 """This fork's own themes, registered without editing upstream's themes.py
 (see docs/rebranding-plan.md section 6 and docs/theme-flat-keys-spec.md)."""
 
+import os
+import sys
+
 from PyQt5.QtGui import QColor, QPalette
 from PyQt5.QtWidgets import QApplication, QProxyStyle, QStyle, QStyleFactory
 
 import key_style
 import themes
 
-DEFAULT_THEME = "KeRT Light"
+# the default theme and first in the Theme menu (2026-10-04: "KeRT Light" renamed, the menu is back with
+# upstream's themes after it; docs/theme-menu-spec.md)
+DEFAULT_THEME = "KeRT Color"
+# saved under its own key: "theme" may still hold an upstream name saved while the menu was hidden
+SETTINGS_KEY = "kert_theme"
 
-# light themes: the inner part of a masked key is drawn only slightly lighter than the key
-LIGHT_THEME_NAMES = {"KeRT Light"}
+# light themes: the inner part of a masked key is drawn only slightly lighter than the key (none of ours
+# since KeRT Color became a copy of the dark Arc)
+LIGHT_THEME_NAMES = set()
 
+# outline colour of the boxes the KeRT stylesheet draws (QPalette.Mid, which Arc leaves unset): Arc's own
+# border shade, a little darker than its window
+KERT_OUTLINE = "#2b2e39"
+
+# KeRT Color: a copy of upstream's Arc palette (themes.py; 2026-10-04, light grey #f5f6f8 with #f0f0f0
+# selection before), plus the outline colour
+_KERT_COLOR = dict(dict(themes.themes)["Arc"])
+_KERT_COLOR[QPalette.Mid] = KERT_OUTLINE
 BRAND_THEMES = [
-    (DEFAULT_THEME, {
-        QPalette.Window: "#f5f6f8",
-        QPalette.WindowText: "#1f2328",
-        QPalette.Base: "#ffffff",
-        QPalette.AlternateBase: "#f5f6f8",
-        QPalette.ToolTipBase: "#ffffff",
-        QPalette.ToolTipText: "#1f2328",
-        QPalette.Text: "#1f2328",
-        QPalette.Button: "#ffffff",           # key body
-        QPalette.ButtonText: "#1f2328",       # key legend
-        QPalette.Mid: "#303030",              # key outline, widget borders
-        QPalette.BrightText: "#d1242f",
-        QPalette.Link: "#0969da",
-        QPalette.Highlight: "#f0f0f0",        # selection / pressed: near white, standing out from the black keys,
-                                              # tabs and layer buttons (2026-09-30; #767676 / #cccccc / KeRT green before)
-        QPalette.HighlightedText: "#1f2328",  # dark text on it
-        (QPalette.Active, QPalette.Button): "#ffffff",
-        (QPalette.Disabled, QPalette.ButtonText): "#9aa0a6",
-        (QPalette.Disabled, QPalette.WindowText): "#9aa0a6",
-        (QPalette.Disabled, QPalette.Text): "#9aa0a6",
-        (QPalette.Disabled, QPalette.Light): "#ffffff",
-    }),
+    (DEFAULT_THEME, _KERT_COLOR),
 ]
 
 _registered = False
@@ -71,16 +66,48 @@ class BrandStyle(QProxyStyle):
 
 
 def resolve_theme(saved):
-    """KeRT Light is the only theme: whatever was saved (an upstream theme name from before the
-    rebranding, "System", nothing) resolves to it."""
+    """A saved theme name that the Theme menu offers ("System" or a registered theme) is kept; nothing,
+    an unknown name or the old "KeRT Light" give DEFAULT_THEME"""
+    if saved == "System" or saved in {name for name, _ in themes.themes}:
+        return saved
     return DEFAULT_THEME
+
+
+def saved_theme(settings, web=None):
+    """The theme chosen last time: QSettings on the desktop, the page's localStorage (handed over as the
+    KERT_THEME environment variable) in the browser, where Qt keeps QSettings in memory only"""
+    if web is None:
+        web = sys.platform == "emscripten"
+    saved = os.environ.get("KERT_THEME") if web else settings.value(SETTINGS_KEY, None)
+    return resolve_theme(saved)
+
+
+def save_theme(settings, name, web=None):
+    if web is None:
+        web = sys.platform == "emscripten"
+    if web:
+        import vialglue
+        vialglue.save_theme(name)
+    else:
+        settings.setValue(SETTINGS_KEY, name)
+
+
+# rules for every theme (upstream's and System too, 2026-10-04)
+COMMON_STYLE = """
+        QTabWidget::tab-bar {
+            alignment: center;   /* every tab bar: editors, picker, and the tabs inside Macros / Key Override / Alt Repeat Key / QMK Settings */
+        }
+"""
 
 
 def stylesheet(name):
     """Application stylesheet for one of our themes: every box gets the same rounded corners and
-    line width as the keys. Empty for other themes so upstream's look is untouched."""
+    line width as the keys. Other themes (upstream's, "System") keep their own look except for the dark
+    key look (key_button_style), as the keys are painted black whatever the theme."""
     if name not in {n for n, _ in BRAND_THEMES}:
-        return ""
+        pal = QApplication.palette()
+        return COMMON_STYLE + key_button_style({QPalette.Highlight: pal.color(QPalette.Highlight).name(),
+                                                QPalette.HighlightedText: pal.color(QPalette.HighlightedText).name()})
     colors = dict(BRAND_THEMES)[name]
     mid = colors[QPalette.Mid]
     r = key_style.CORNER_RADIUS
@@ -119,9 +146,6 @@ def stylesheet(name):
         QPushButton[layerButton="true"][lit="true"] {{
             color: {hlt};
         }}
-        QTabWidget::tab-bar {{
-            alignment: center;   /* every tab bar: editors, picker, and the tabs inside Macros / Key Override / Alt Repeat Key / QMK Settings */
-        }}
         QTabBar::tab {{
             border: {w}px solid {mid};
             border-bottom: none;
@@ -159,7 +183,7 @@ def stylesheet(name):
                base=colors[QPalette.Base], disabled=colors[(QPalette.Disabled, QPalette.Text)],
                text=colors[QPalette.ButtonText],
                check='\n            image: url("{}");'.format(CHECK_IMAGE) if CHECK_IMAGE else "")
-            + key_button_style(colors))
+            + COMMON_STYLE + key_button_style(colors))
 
 
 def key_button_style(colors):
@@ -177,9 +201,6 @@ def key_button_style(colors):
             border-radius: {r}px;
             margin: {mt}px {mr}px {mb}px {ml}px;
             padding: 0px;
-        }}
-        QPushButton[keyButton="true"]:hover {{
-            background-color: {hover};
         }}
         QPushButton[keyButton="true"]:pressed {{
             background-color: {hl};
@@ -225,13 +246,8 @@ def key_button_style(colors):
         QPushButton[layerButton="true"][lit="true"], QPushButton[layerButton="true"][lit="true"]:disabled {{
             color: {hlt};
         }}
-        /* a hovered layer button turns white (LayerHighlight): dark label */
-        QPushButton[layerButton="true"][hovered="true"], QPushButton[layerButton="true"][hovered="true"]:disabled {{
-            color: {hover_legend};
-        }}
-    """.format(face=key_style.KEY_FACE, legend=key_style.KEY_LEGEND, r=key_style.KEY_RADIUS,
-               hover=key_style.KEY_HOVER_FACE, hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
-               hover_legend=key_style.HOVER_LEGEND,
+    """.format(face=key_style.face_css(), legend=key_style.KEY_LEGEND, r=key_style.KEY_RADIUS,
+               hover=key_style.face_css(key_style.KEY_HOVER_FACE), hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
                ml=key_style.KEY_MARGINS[0], mt=key_style.KEY_MARGINS[1], mr=key_style.KEY_MARGINS[2],
                mb=key_style.KEY_MARGINS[3])
 
@@ -240,13 +256,10 @@ def register():
     """Add the brand themes to the themes module. Call before MainWindow is created (it builds the
     Theme menu from themes.themes and applies the theme in its constructor). Safe to call twice."""
     global _registered
-    # KeRT Light is the only theme: drop upstream's themes (themes.py itself is left untouched so
+    # our themes first in the Theme menu, upstream's after them (themes.py itself is left untouched so
     # that it does not conflict when merging upstream)
     brand_names = {name for name, _ in BRAND_THEMES}
-    themes.themes[:] = [t for t in themes.themes if t[0] in brand_names]
-    for name in list(themes.palettes):
-        if name not in brand_names:
-            del themes.palettes[name]
+    themes.themes[:] = list(BRAND_THEMES) + [t for t in themes.themes if t[0] not in brand_names]
     for name, colors in BRAND_THEMES:
         if name in themes.palettes:
             continue
@@ -256,7 +269,6 @@ def register():
                 role = [role]
             palette.setColor(*role, QColor(color))
         themes.palettes[name] = palette
-        themes.themes.append((name, colors))
 
     if not _registered:
         # Theme.mask_light_factor() only knows upstream's "Light"; treat our light themes the same
