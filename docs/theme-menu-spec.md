@@ -66,3 +66,36 @@ flowchart TD
 | `test_theme.py::test_upstream_theme_keeps_the_key_look` | Dark と System に KeRT の線は付かず、黒いキー・透明なレイヤーボタンの規則は付く |
 | `test_theme.py::test_tabs_centred_in_every_theme` | KeRT Color・Dark・Nord・System のどれでもタブの中央寄せがある |
 | `test_web_start_page.py::test_page_keeps_the_theme` | `main.c` の `save_theme`、ページの保存と `ENV.KERT_THEME` |
+
+## 6. 適用中の覆い（2026-10-05）
+
+テーマメニューでテーマを選んでから、適用が終わって再読み込み（デスクトップは再起動）を促すメッセージが出るまで、
+画面全体を半透明の黒で覆い、中央にローディングスピナーを出す。覆いの間はクリックも受け付けない。
+
+- `MainWindow.set_theme()`: 覆いを出し（`widgets/busy_overlay.py` の `set_busy(window, True)`）、
+  `THEME_COVER_MS = 50` ms 後に `apply_theme()` でテーマを適用・保存し、覆いを外してから `show_theme_message()`。
+  間を置くのは、重い適用処理の前に覆いを画面に出すため。
+- デスクトップ版: メインウィンドウ全体に重ねる `BusyOverlay`（黒 アルファ 140、白い円弧のスピナー）。
+  適用は同じスレッドで動くので、その間スピナーは止まって見える。
+- ブラウザ版: `vialglue.busy(1/0)` → `{cmd: "busy"}` → ページの `#busy_cover`（`rgba(0, 0, 0, 0.55)`、中央に CSS の
+  スピナー）。ページはワーカーと別のスレッドなので、適用中もスピナーは回り続ける。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant M as MainWindow
+    participant B as 覆い（BusyOverlay / ページの #busy_cover）
+    U->>M: テーマを選ぶ
+    M->>B: set_busy(True)（半透明の黒とスピナー）
+    Note over M: 50 ms 待つ（覆いが画面に出る）
+    M->>M: apply_theme()（テーマの適用・保存）
+    M->>B: set_busy(False)
+    M->>U: 再読み込み / 再起動を促すメッセージ
+```
+
+| テスト | 確認内容 |
+|---|---|
+| `test_theme_busy.py::test_cover_while_the_theme_is_applied` | 選んだ直後に覆いが出て、テーマはまだ適用されない。適用は覆いの下で行われ、メッセージの時には覆いが消えている |
+| `test_theme_busy.py::test_cover_is_translucent_black_with_a_spinner` | 覆いがウィンドウ全体で、暗くなるが真っ黒ではなく、中央の輪の上に明るいスピナーの円弧がある |
+| `test_theme_busy.py::test_web_cover_is_drawn_by_the_page` | ブラウザ版は `vialglue.busy(1)` / `busy(0)` を送り、Qt の覆いは出さない |
+| `test_web_start_page.py::test_page_draws_the_busy_cover` | `main.c` の `busy`、ページの `#busy_cover`（固定・半透明の黒・中央のスピナー）と `cmd == "busy"` の処理 |

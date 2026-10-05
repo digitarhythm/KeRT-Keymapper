@@ -222,7 +222,23 @@ static PyObject* vialglue_save_theme(PyObject *self, PyObject *args) {
     return PyLong_FromLong(0);
 }
 
+// a translucent black cover with a spinner over the app while something slow runs (a theme pick:
+// widgets/busy_overlay.py); the page draws it, so the spinner keeps turning while this worker is busy
+static PyObject* vialglue_busy(PyObject *self, PyObject *args) {
+    int on;
+
+    if (!PyArg_ParseTuple(args, "i", &on))
+        return NULL;
+
+    EM_ASM({
+        postMessage({cmd: "busy", on: $0});
+    }, on);
+
+    return PyLong_FromLong(0);
+}
+
 static PyMethodDef VialglueMethods[] = {
+    {"busy",  vialglue_busy, METH_VARARGS, ""},
     {"save_theme",  vialglue_save_theme, METH_VARARGS, ""},
     {"progress",  vialglue_progress, METH_VARARGS, ""},
     {"fade",  vialglue_fade, METH_VARARGS, ""},

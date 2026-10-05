@@ -243,6 +243,32 @@ body {
 #startup_btn.busy #startup_spinner {
     display: inline-block;
 }
+/* a translucent black cover with a spinner over the app while it is busy (a theme pick:
+   widgets/busy_overlay.py sends {cmd: "busy"}); it swallows the clicks meanwhile */
+#busy_cover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 95;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+#busy_cover.shown {
+    display: flex;
+}
+#busy_spinner {
+    width: 4em;
+    height: 4em;
+    box-sizing: border-box;
+    border: 6px solid rgba(211, 218, 227, 0.25);
+    border-top-color: var(--kert-text);
+    border-radius: 50%;
+    animation: kert-spin 0.8s linear infinite;
+}
 @keyframes kert-spin {
     to { transform: rotate(360deg); }
 }
@@ -316,6 +342,7 @@ body {
 
 <canvas id="canvas" oncontextmenu="return false;" tabindex="-1"></canvas>
 <div id="page_fade"></div>
+<div id="busy_cover"><div id="busy_spinner"></div></div>
 
 <script>
     // page texts, Japanese when the browser language is Japanese (the app itself follows the same rule)
@@ -554,6 +581,8 @@ body {
             progress_step(e.data.step, e.data.done, e.data.total);
         } else if (e.data.cmd == "fade") {
             page_fade(e.data);
+        } else if (e.data.cmd == "busy") {
+            document.getElementById("busy_cover").classList.toggle("shown", !!e.data.on);
         } else if (e.data.cmd == "theme") {
             // Theme menu: Qt keeps its settings in memory only here, so the page keeps the choice
             try {

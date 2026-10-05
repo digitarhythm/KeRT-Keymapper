@@ -231,3 +231,20 @@ def test_worker_asks_for_a_plain_webgl_canvas():
     assert "attributes.antialias = false;" in worker
     # set up at the top level, before the "py" handler: Qt creates its context while the app starts
     assert worker.index("OffscreenCanvas.prototype.getContext") < worker.index("function kert_handle_message")
+
+
+def test_page_draws_the_busy_cover():
+    """Theme switch in the browser (docs/theme-menu-spec.md): vialglue.busy(1/0) -> {cmd: "busy"} -> the page
+    shows / hides a translucent black cover with a spinner in the middle, over the app"""
+    import re
+    html = page()
+    c = open(os.path.join(os.path.dirname(PAGE), "main.c"), encoding="utf-8").read()
+    assert '{"busy",  vialglue_busy, METH_VARARGS, ""}' in c
+    assert 'cmd: "busy"' in c
+    assert '<div id="busy_cover"><div id="busy_spinner"></div></div>' in html
+    cover = css_block(html, "#busy_cover")
+    assert "position:fixed" in cover and "display:none" in cover and re.search(r"rgba\(0,0,0,0\.\d+\)", cover)
+    assert "display:flex" in css_block(html, "#busy_cover.shown")
+    assert "kert-spin" in css_block(html, "#busy_spinner")
+    assert 'e.data.cmd == "busy"' in html
+    assert 'classList.toggle("shown", !!e.data.on)' in html

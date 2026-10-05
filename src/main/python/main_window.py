@@ -17,7 +17,7 @@ from editor.alt_repeat_key import AltRepeatKey
 from editor.combos import Combos
 from constants import WINDOW_WIDTH, WINDOW_HEIGHT
 from widgets.editor_container import EditorContainer
-from widgets import tab_fade, key_shadow
+from widgets import busy_overlay, tab_fade, key_shadow
 from editor.firmware_flasher import FirmwareFlasher
 from editor.key_override import KeyOverride
 from protocol.keyboard_comm import ProtocolError
@@ -37,9 +37,13 @@ from editor.matrix_test import MatrixTest
 
 import themes
 import branding_theme
+
 import branding
 import startup_progress
 from widgets.device_combobox import DeviceComboBox
+
+# a theme pick: the cover shows this long before the theme is applied (the browser paints it meanwhile)
+THEME_COVER_MS = 50
 
 
 # inner margin of the header row (keyboard selector), in pixels
@@ -514,8 +518,24 @@ class MainWindow(QMainWindow):
         return branding_theme.saved_theme(self.settings)
 
     def set_theme(self, theme):
-        themes.Theme.set_theme(theme)
-        branding_theme.save_theme(self.settings, theme)
+        """A theme picked in the Theme menu: a translucent black cover with a spinner first, the theme
+        applied a moment later (once the cover shows), the cover gone, then the reload / restart message"""
+        busy_overlay.set_busy(self, True)
+        QTimer.singleShot(THEME_COVER_MS, lambda: self.apply_theme(theme))
+
+    def apply_theme(self, theme):
+        try:
+            themes.Theme.set_theme(theme)
+            branding_theme.save_theme(self.settings, theme)
+        finally:
+            busy_overlay.set_busy(self, False)
+        self.show_theme_message()
+
+    def busy_overlay_shown(self):
+        cover = getattr(self, "busy_overlay", None)
+        return cover is not None and cover.isVisible()
+
+    def show_theme_message(self):
         if sys.platform == "emscripten":
             # no nested event loop (exec_) in the browser build: shown without blocking
             self.theme_message = QMessageBox(self)
