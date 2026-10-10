@@ -29,7 +29,14 @@ NO_DEVICES = 'No devices detected. Connect a Vial-compatible device and press "R
 NO_DEVICES_LINUX = NO_DEVICES + '<br><br>On Linux you need to set up a custom udev rule for keyboards to be detected. ' \
                                 'Follow the instructions linked below:<br>' \
                                 '<a href="https://get.vial.today/manual/linux-udev.html">https://get.vial.today/manual/linux-udev.html</a>'
-DYNAMIC_SOURCES = {("MainWindow", NO_DEVICES), ("MainWindow", NO_DEVICES_LINUX)}
+# the Definitions tabs are translated (2026-10-10, test_mode_buttons.py) through tr("MainWindow", label)
+DEFINITION_TABS = ["Tap Dance", "HostOS", "Combos", "Macros", "Key Overrides", "Alt Repeat Key", "QMK Settings",
+                   "Matrix tester"]
+# and the picker's tabs (tr("TabbedKeycodes", tab.label)) but for ISO/JIS, Quantum and MIDI
+PICKER_TABS_TRANSLATED = ["Basic", "Layers", "Backlight", "App, Media and Mouse", "Tap Dance", "HostOS", "User",
+                          "Macro"]
+DYNAMIC_SOURCES = {("MainWindow", NO_DEVICES), ("MainWindow", NO_DEVICES_LINUX)} | \
+    {("MainWindow", lbl) for lbl in DEFINITION_TABS} | {("TabbedKeycodes", lbl) for lbl in PICKER_TABS_TRANSLATED}
 
 
 def qmk_settings_titles():
@@ -104,10 +111,17 @@ def test_catalog_matches_sources():
 
 
 def test_tab_labels_not_in_catalog():
-    sources = {s for c, s, t, ty in catalog_messages()}
-    assert sources.isdisjoint(EDITOR_TABS)
-    assert sources.isdisjoint(PICKER_TABS)
-    assert sources.isdisjoint(QMK_SETTINGS_TABS)
+    """The main window's Definitions tabs are translated (2026-10-10); the other editor tabs (Keymap,
+    Layout, Lighting, Firmware updater), the picker's and the QMK Settings' tabs stay English"""
+    messages = {(c, s) for c, s, t, ty in catalog_messages()}
+    main = {s for c, s in messages if c == "MainWindow"}
+    assert set(DEFINITION_TABS) <= main
+    assert main.isdisjoint(set(EDITOR_TABS) - set(DEFINITION_TABS))
+    # the picker's tabs are translated too (2026-10-10) but for ISO/JIS, Quantum and MIDI
+    picker = {s for c, s in messages if c == "TabbedKeycodes"}
+    assert set(PICKER_TABS) - {"ISO/JIS", "Quantum", "MIDI"} <= picker
+    assert picker.isdisjoint({"ISO/JIS", "Quantum", "MIDI"})
+    assert {s for c, s in messages if c == "QmkSettings"}.isdisjoint(QMK_SETTINGS_TABS)
 
 
 def test_resolve_language():
@@ -123,9 +137,12 @@ def test_install_ja_translates(ja):
     assert tr("MainWindow", "Refresh") == "更新"
     assert tr("TapDance", "On tap") == "タップ"
     assert tr("KeymapEditor", "Layer") == "レイヤー"
-    # tab labels are intentionally left in English
+    # Keymap stays English; the Definitions tabs are translated (2026-10-10)
     assert tr("MainWindow", "Keymap") == "Keymap"
-    assert tr("MainWindow", "Tap Dance") == "Tap Dance"
+    assert tr("MainWindow", "Tap Dance") == "タップダンス"
+    assert tr("MainWindow", "Matrix tester") == "キーテスター"
+    assert tr("TabbedKeycodes", "App, Media and Mouse") == "メディア・マウス"
+    assert tr("TabbedKeycodes", "Quantum") == "Quantum"
 
 
 def test_install_en_keeps_english(qtbot):
@@ -168,10 +185,29 @@ def test_editor_labels_translated(ja, qtbot):
     assert mw.btn_refresh_devices.text() == "更新"
     assert mw.keymap_editor.layer_label.text() == "レイヤー"
 
-    # tabs stay English
-    assert [mw.tabs.tabText(x) for x in range(mw.tabs.count())] == \
-           [lbl for lbl in EDITOR_TABS if find_tab(mw, lbl) is not None]
-    assert tray_tab_names(mw)[:2] == ["Basic", "ISO/JIS"]
+    # Keymap alone in Key mapping mode, the others in Definitions mode (test_mode_buttons.py); the
+    # Definitions tabs are translated (2026-10-10)
+    assert mw._tab_labels == ["Keymap"]
+    mw.set_mode("definitions")
+    shown = [mw.tabs.tabText(x) for x in range(mw.tabs.count())]
+    assert mw._tab_labels == [lbl for c, lbl in mw.editors if c.valid() and lbl != "Keymap"]
+    assert set(mw._tab_labels) <= set(EDITOR_TABS)
+    ja = {"Tap Dance": "タップダンス", "HostOS": "ホストOS", "Combos": "コンボ", "Macros": "マクロ",
+          "Key Overrides": "キー上書き", "Alt Repeat Key": "代替キー", "QMK Settings": "QMK設定",
+          "Matrix tester": "キーテスター"}
+    assert shown == [ja.get(lbl, lbl) for lbl in mw._tab_labels]
+    assert "タップダンス" in shown and "マクロ" in shown
+    assert mw.btn_mode_keymap.text() == "キーマッピング" and mw.btn_mode_definitions.text() == "各種定義"
+    # the picker's tabs (2026-10-10)
+    tk = {"Basic": "基本", "Layers": "レイヤー", "Backlight": "バックライト", "App, Media and Mouse": "メディア・マウス",
+          "Tap Dance": "タップダンス", "HostOS": "ホストOS", "User": "ユーザー定義", "Macro": "マクロ"}
+    ak = mw.tray_keycodes.all_keycodes
+    assert tray_tab_names(mw) == [tk.get(ak.widget(i).label, ak.widget(i).label) for i in range(ak.count())]
+    assert tray_tab_names(mw)[:4] == ["基本", "ISO/JIS", "レイヤー", "Quantum"]
+    # the selected picker tab survives a rebuild of the buttons although the shown names are translated
+    ak.setCurrentIndex(2)
+    ak.recreate_keycode_buttons()
+    assert ak.currentWidget().label == "Layers"
 
     td = mw.tap_dance
     assert labels_of(td.tap_dance_entries[0].container) == \

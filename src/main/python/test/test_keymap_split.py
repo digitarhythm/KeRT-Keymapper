@@ -239,9 +239,13 @@ def test_layer_buttons_align_with_tab_bar(qtbot):
 
 
 def test_layer_button_guide_is_editor_tab_bar(qtbot):
-    """The main window points the guide at the left edge of the (centred) editor tab bar"""
+    """The main window points the guide at the left edge of the (centred) editor tab bar; in Key mapping
+    mode (where the keymap shows) there is no tab bar, so no guide (2026-10-10, test_mode_buttons.py)"""
     mw, ke = prepared(qtbot)
     bar = mw.tabs.tabBar()
+    assert mw.mode == "keymap" and bar.isHidden()
+    assert ke.left_guide() is None
+    mw.set_mode("definitions")
     qtbot.waitUntil(lambda: bar.count() > 0 and bar.isVisible())
     assert ke.left_guide() == bar.mapToGlobal(bar.tabRect(0).topLeft()).x()
     # the tab bar is centred, so its left edge is well inside the window

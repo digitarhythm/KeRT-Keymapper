@@ -645,7 +645,11 @@ HOST_OS_MARKER = 0x4F53
 
 
 def find_tab(mw, label):
-    """ Returns the EditorContainer for the main window tab with the given label, or None """
+    """ Returns the EditorContainer for the main window tab with the given label, or None. Switches to
+    the mode that shows it first (Keymap: Key mapping, the others: Definitions - test_mode_buttons.py) """
+    wanted = "keymap" if label == "Keymap" else "definitions"
+    if mw.mode != wanted:
+        mw.set_mode(wanted)
     for x in range(mw.tabs.count()):
         if mw.tabs.tabText(x) == label:
             return mw.tabs.widget(x)
@@ -688,7 +692,8 @@ def test_host_os(qtbot):
     kb = mw.autorefresh.current_device.keyboard
     assert (kb.tap_dance_count, kb.host_os_count, kb.host_os_base) == (4, 2, 2)
 
-    # Tap Dance keeps only the slots below base; HostOS sits right after it
+    # Tap Dance keeps only the slots below base; HostOS sits right after it (Definitions mode)
+    mw.set_mode("definitions")
     main_tabs = [mw.tabs.tabText(x) for x in range(mw.tabs.count())]
     assert main_tabs.index("HostOS") == main_tabs.index("Tap Dance") + 1
     tde = find_tab(mw, "Tap Dance").editor

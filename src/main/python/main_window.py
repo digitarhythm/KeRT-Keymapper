@@ -6,7 +6,7 @@ from json import JSONDecodeError
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt, QSettings, QStandardPaths, QTimer, QRect, QT_VERSION_STR
 from PyQt5.QtWidgets import QWidget, QComboBox, QToolButton, QHBoxLayout, QVBoxLayout, QMainWindow, QAction, qApp, \
-    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QSizePolicy
+    QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QSizePolicy, QPushButton, QButtonGroup
 
 import os
 import sys
@@ -44,6 +44,10 @@ from widgets.device_combobox import DeviceComboBox
 
 # a theme pick: the cover shows this long before the theme is applied (the browser paints it meanwhile)
 THEME_COVER_MS = 50
+# the header's mode buttons use the keyboard selector's font this many points smaller, and are this much
+# as tall as it (2026-10-10)
+MODE_FONT_SMALLER = 2
+MODE_HEIGHT_RATIO = 0.8
 
 
 # inner margin of the header row (keyboard selector), in pixels
@@ -124,7 +128,30 @@ class MainWindow(QMainWindow):
         layout_combobox.addWidget(self.lbl_select_keyboard, 0)
         layout_combobox.addSpacing(6)
         layout_combobox.addWidget(self.lbl_logo_image, 0)
-        layout_combobox.addStretch(1)   # icon and logo at the left, selector and Refresh at the right
+        # the two modes, right of the logo (docs/mode-buttons-spec.md): the keymap alone, or the other
+        # editors' tabs - so that Keymap does not sit in one row with the definition tabs
+        self.btn_mode_keymap = QPushButton(tr("MainWindow", "Key mapping"))
+        self.btn_mode_definitions = QPushButton(tr("MainWindow", "Definitions"))
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.setExclusive(True)
+        # a little smaller than the keyboard selector's font (2026-10-10), both buttons as wide as the wider
+        mode_font = self.combobox_devices.font()
+        mode_font.setPointSize(mode_font.pointSize() - MODE_FONT_SMALLER)
+        for btn, mode in ((self.btn_mode_keymap, "keymap"), (self.btn_mode_definitions, "definitions")):
+            btn.setCheckable(True)
+            btn.setProperty("modeButton", True)     # filled with the highlight when checked, in any theme
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setFont(mode_font)
+            btn.setFixedHeight(round(self.combobox_devices.minimumHeight() * MODE_HEIGHT_RATIO))
+            btn.clicked.connect(lambda checked, m=mode: self.set_mode(m))
+            self.mode_group.addButton(btn)
+        mode_width = max(self.btn_mode_keymap.sizeHint().width(), self.btn_mode_definitions.sizeHint().width())
+        self.btn_mode_keymap.setFixedWidth(mode_width)
+        self.btn_mode_definitions.setFixedWidth(mode_width)
+        layout_combobox.addSpacing(12)
+        layout_combobox.addWidget(self.btn_mode_keymap, 0)
+        layout_combobox.addWidget(self.btn_mode_definitions, 0)
+        layout_combobox.addStretch(1)   # icon, logo and modes at the left, selector and Refresh at the right
         layout_combobox.addWidget(self.combobox_devices, 0)
         if sys.platform != "emscripten":
             layout_combobox.addWidget(self.btn_refresh_devices, 0)
@@ -143,16 +170,21 @@ class MainWindow(QMainWindow):
         self.matrix_tester = MatrixTest(self.layout_editor)
         self.rgb_configurator = RGBConfigurator()
 
-        self.editors = [(self.keymap_editor, "Keymap"), (self.layout_editor, "Layout"), (self.macro_recorder, "Macros"),
-                        (self.rgb_configurator, "Lighting"), (self.tap_dance, "Tap Dance"), (self.host_os, "HostOS"),
-                        (self.combos, "Combos"), (self.key_override, "Key Overrides"), (self.alt_repeat_key, "Alt Repeat Key"),
-                        (self.qmk_settings, "QMK Settings"), (self.matrix_tester, "Matrix tester"),
-                        (self.firmware_flasher, "Firmware updater")]
+        # Keymap (Key mapping mode), then the Definitions tabs in this order (2026-10-10); the ones only some
+        # keyboards have come last
+        self.editors = [(self.keymap_editor, "Keymap"), (self.tap_dance, "Tap Dance"), (self.host_os, "HostOS"),
+                        (self.combos, "Combos"), (self.macro_recorder, "Macros"), (self.key_override, "Key Overrides"),
+                        (self.alt_repeat_key, "Alt Repeat Key"), (self.qmk_settings, "QMK Settings"),
+                        (self.matrix_tester, "Matrix tester"), (self.layout_editor, "Layout"),
+                        (self.rgb_configurator, "Lighting"), (self.firmware_flasher, "Firmware updater")]
 
         Unlocker.global_layout_editor = self.layout_editor
         Unlocker.global_main_window = self
 
         self.current_tab = None
+        self.mode = "keymap"
+        self.btn_mode_keymap.setChecked(True)
+        self.tab_pages = {}             # editor -> its EditorContainer, kept between modes
         self.tabs = QTabWidget()
         self.tabs.setObjectName("editor_tabs")   # the stylesheet centres this tab bar
         self.tabs.currentChanged.connect(self.on_tab_changed)
@@ -424,19 +456,34 @@ class MainWindow(QMainWindow):
                   self.qmk_settings, self.matrix_tester, self.rgb_configurator]:
             e.rebuild(self.autorefresh.current_device)
 
+    def in_mode(self, label):
+        """Key mapping mode shows the Keymap editor, Definitions mode every other one"""
+        return (label == "Keymap") == (self.mode == "keymap")
+
+    def set_mode(self, mode):
+        """The header's mode buttons: "keymap" (the keymap alone, no tab bar) or "definitions" (the other
+        editors' tabs, Tap Dance selected - 2026-10-10, Macros before)"""
+        self.mode = mode
+        (self.btn_mode_keymap if mode == "keymap" else self.btn_mode_definitions).setChecked(True)
+        self.refresh_tabs()
+        if mode == "definitions":
+            labels = getattr(self, "_tab_labels", [])
+            self.tabs.setCurrentIndex(labels.index("Tap Dance") if "Tap Dance" in labels else 0)
+
     def refresh_tabs(self):
         # rebuilding every tab is expensive (very much so in the browser build): only do it when the
-        # set of valid editors changed
-        wanted = [lbl for container, lbl in self.editors if container.valid()]
-        if wanted == getattr(self, "_tab_labels", None) and self.tabs.count() == len(wanted):
+        # set of valid editors (in the current mode) changed; the editors' containers are kept
+        wanted = [(container, lbl) for container, lbl in self.editors if container.valid() and self.in_mode(lbl)]
+        labels = [lbl for container, lbl in wanted]
+        self.tabs.tabBar().setVisible(self.mode != "keymap")
+        if labels == getattr(self, "_tab_labels", None) and self.tabs.count() == len(labels):
             return
-        self._tab_labels = wanted
+        self._tab_labels = labels
         self.tabs.clear()
-        for container, lbl in self.editors:
-            if not container.valid():
-                continue
-
-            c = EditorContainer(container)
+        for container, lbl in wanted:
+            c = self.tab_pages.get(container)
+            if c is None:
+                c = self.tab_pages[container] = EditorContainer(container)
             self.tabs.addTab(c, tr("MainWindow", lbl))
         # the editors' own tab widgets join the window only now: give them the fade (and tab shadows) too
         tab_fade.enable_all(self)
@@ -447,7 +494,7 @@ class MainWindow(QMainWindow):
     def tab_bar_left(self):
         """Global x of the tab bar's left edge (None while there are no tabs)"""
         bar = self.tabs.tabBar()
-        if bar.count() == 0:
+        if bar.count() == 0 or bar.isHidden():
             return None
         return bar.mapToGlobal(bar.tabRect(0).topLeft()).x()
 

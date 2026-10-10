@@ -20,6 +20,46 @@
         <translation>テーマを完全に適用するにはアプリケーションを再起動してください。</translation>
     </message>
     <message>
+        <source>Key mapping</source>
+        <translation>キーマッピング</translation>
+    </message>
+    <message>
+        <source>Definitions</source>
+        <translation>各種定義</translation>
+    </message>
+    <message>
+        <source>Tap Dance</source>
+        <translation>タップダンス</translation>
+    </message>
+    <message>
+        <source>HostOS</source>
+        <translation>ホストOS</translation>
+    </message>
+    <message>
+        <source>Combos</source>
+        <translation>コンボ</translation>
+    </message>
+    <message>
+        <source>Macros</source>
+        <translation>マクロ</translation>
+    </message>
+    <message>
+        <source>Key Overrides</source>
+        <translation>キー上書き</translation>
+    </message>
+    <message>
+        <source>Alt Repeat Key</source>
+        <translation>代替キー</translation>
+    </message>
+    <message>
+        <source>QMK Settings</source>
+        <translation>QMK設定</translation>
+    </message>
+    <message>
+        <source>Matrix tester</source>
+        <translation>キーテスター</translation>
+    </message>
+    <message>
         <source>In order to fully apply the theme you should reload the page.</source>
         <translation>テーマを完全に適用するにはページを再読み込みしてください。</translation>
     </message>
@@ -767,6 +807,41 @@ or select Security-&gt;Lock from the menu.</source>
     <message>
         <source>Clear</source>
         <translation>クリア</translation>
+    </message>
+</context>
+<context>
+    <name>TabbedKeycodes</name>
+    <message>
+        <source>Basic</source>
+        <translation>基本</translation>
+    </message>
+    <message>
+        <source>Layers</source>
+        <translation>レイヤー</translation>
+    </message>
+    <message>
+        <source>Backlight</source>
+        <translation>バックライト</translation>
+    </message>
+    <message>
+        <source>App, Media and Mouse</source>
+        <translation>メディア・マウス</translation>
+    </message>
+    <message>
+        <source>Tap Dance</source>
+        <translation>タップダンス</translation>
+    </message>
+    <message>
+        <source>HostOS</source>
+        <translation>ホストOS</translation>
+    </message>
+    <message>
+        <source>User</source>
+        <translation>ユーザー定義</translation>
+    </message>
+    <message>
+        <source>Macro</source>
+        <translation>マクロ</translation>
     </message>
 </context>
 </TS>

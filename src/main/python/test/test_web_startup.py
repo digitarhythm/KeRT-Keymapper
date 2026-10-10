@@ -85,6 +85,7 @@ def test_refresh_tabs_skips_when_unchanged(qtbot):
 
     mw, vk = prepare(qtbot, FAKE_KEYBOARD, combos=[[4, 5, 0, 0, 6]] * 2)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    mw.set_mode("definitions")             # Combos is a Definitions tab
     before = [mw.tabs.widget(i) for i in range(mw.tabs.count())]
     assert before
     mw.refresh_tabs()
@@ -92,11 +93,11 @@ def test_refresh_tabs_skips_when_unchanged(qtbot):
     assert after == before, "unchanged editors must keep their tab widgets"
 
     # an editor that becomes invalid changes the set of tabs: now the tabs are rebuilt
-    labels = [mw.tabs.tabText(i) for i in range(mw.tabs.count())]
-    assert "Combos" in labels
+    # (the English labels: the shown tab names are translated since 2026-10-10)
+    assert "Combos" in mw._tab_labels
     mw.combos.device = None
     mw.refresh_tabs()
-    assert "Combos" not in [mw.tabs.tabText(i) for i in range(mw.tabs.count())]
+    assert "Combos" not in mw._tab_labels and mw.tabs.count() == len(mw._tab_labels)
 
 
 def test_main_window_preloaded_flag(qtbot):

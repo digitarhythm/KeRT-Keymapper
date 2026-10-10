@@ -611,6 +611,7 @@ def test_editor_tabs_centred(qtbot):
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     mw.resize(1600, 1000)
+    mw.set_mode("definitions")             # the main tab bar shows in Definitions mode
     bar = mw.tabs.tabBar()
     qtbot.waitUntil(lambda: bar.width() > 0 and mw.tabs.width() >= 1500)
     assert mw.tabs.objectName() == "editor_tabs"
@@ -634,6 +635,7 @@ def test_inner_editor_tabs_centred(qtbot):
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     mw.resize(1600, 1000)
+    mw.set_mode("definitions")             # the main tab bar shows in Definitions mode
     assert "QTabWidget::tab-bar {" in QApplication.instance().styleSheet()
     checked = 0
     for editor, label in ((mw.macro_recorder, "Macros"), (mw.key_override, "Key Overrides"),

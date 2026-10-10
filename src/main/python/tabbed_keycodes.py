@@ -359,7 +359,8 @@ class FilteredTabbedKeycodes(QTabWidget):
             self.keycode_changed.emit(Keycode.normalize(code))
 
     def recreate_keycode_buttons(self):
-        prev_tab = self.tabText(self.currentIndex()) if self.currentIndex() >= 0 else ""
+        # the current tab by its (English) label: the shown names are translated (2026-10-10)
+        prev_tab = self.currentWidget().label if self.currentWidget() is not None else ""
         # removing / adding pages makes each of them "current" (and shown) for a moment; no page may
         # build itself during that shuffle, only the one that ends up current
         for tab in self.tabs:

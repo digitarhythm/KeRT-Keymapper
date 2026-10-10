@@ -214,7 +214,9 @@ def test_tab_style(qtbot):
 def test_tabs_black_with_shadow(qtbot):
     import key_style
     mw = window(qtbot)
+    mw.set_mode("definitions")              # the main tab bar shows in Definitions mode (test_mode_buttons.py)
     bar = mw.tabs.tabBar()
+    qtbot.waitUntil(lambda: bar.isVisible() and bar.count() > 1 and bar.tabRect(1).width() > 0)
     assert bar.property("keyShadow")
     img = shot(bar)
     r = bar.tabRect(1)                      # not selected

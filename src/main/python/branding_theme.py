@@ -99,6 +99,18 @@ COMMON_STYLE = """
         }
 """
 
+# upstream's themes and System (KeRT Color fills every checked button already): the header's mode buttons
+# (Key mapping / Definitions) - the checked one is filled with the theme's highlight, as the native checked
+# look of those themes barely shows (2026-10-10)
+MODE_BUTTON_STYLE = """
+        QPushButton[modeButton="true"]:checked {
+            background-color: palette(highlight);
+            color: palette(highlighted-text);
+            border: 2px solid palette(highlight);   /* a set border makes Qt draw a flat fill, not a shaded bevel */
+            border-radius: 6px;
+        }
+"""
+
 
 def stylesheet(name):
     """Application stylesheet for one of our themes: every box gets the same rounded corners and
@@ -106,7 +118,7 @@ def stylesheet(name):
     key look (key_button_style), as the keys are painted black whatever the theme."""
     if name not in {n for n, _ in BRAND_THEMES}:
         pal = QApplication.palette()
-        return COMMON_STYLE + key_button_style({QPalette.Highlight: pal.color(QPalette.Highlight).name(),
+        return COMMON_STYLE + MODE_BUTTON_STYLE + key_button_style({QPalette.Highlight: pal.color(QPalette.Highlight).name(),
                                                 QPalette.HighlightedText: pal.color(QPalette.HighlightedText).name()})
     colors = dict(BRAND_THEMES)[name]
     mid = colors[QPalette.Mid]

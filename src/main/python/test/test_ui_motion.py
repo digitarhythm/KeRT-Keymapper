@@ -158,6 +158,7 @@ def test_tab_click_fades(qtbot):
     from widgets import tab_fade
 
     mw = prepared(qtbot)
+    mw.set_mode("definitions")             # the main tab bar shows in Definitions mode
     tabs = mw.tabs
     assert tab_fade.FADE_OUT_MS + tab_fade.FADE_IN_MS == 300
     bar = tabs.tabBar()
@@ -190,6 +191,7 @@ def test_tab_click_fades(qtbot):
 
 def test_programmatic_switch_is_immediate(qtbot):
     mw = prepared(qtbot)
+    mw.set_mode("definitions")             # the main tab bar shows in Definitions mode
     from widgets import tab_fade
     mw.tabs.setCurrentIndex(1)
     assert mw.tabs.currentIndex() == 1
@@ -240,6 +242,7 @@ def test_web_fade_uses_the_page_overlay(qtbot, monkeypatch):
     monkeypatch.setattr(tab_fade, "WEB", True)
     mw = prepared(qtbot)
     settled(qtbot, mw.keymap_editor)
+    mw.set_mode("definitions")             # the main tab bar shows in Definitions mode
     tabs = mw.tabs
     f = tab_fade.fader(tabs)
     bar = tabs.tabBar()
