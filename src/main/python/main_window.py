@@ -48,6 +48,8 @@ THEME_COVER_MS = 50
 # as tall as it (2026-10-10)
 MODE_FONT_SMALLER = 2
 MODE_HEIGHT_RATIO = 0.8
+# extra room left and right of the mode buttons' text, each side, in pixels (2026-10-10)
+MODE_SIDE_MARGIN = 12
 
 
 # inner margin of the header row (keyboard selector), in pixels
@@ -145,7 +147,8 @@ class MainWindow(QMainWindow):
             btn.setFixedHeight(round(self.combobox_devices.minimumHeight() * MODE_HEIGHT_RATIO))
             btn.clicked.connect(lambda checked, m=mode: self.set_mode(m))
             self.mode_group.addButton(btn)
-        mode_width = max(self.btn_mode_keymap.sizeHint().width(), self.btn_mode_definitions.sizeHint().width())
+        mode_width = max(self.btn_mode_keymap.sizeHint().width(),
+                         self.btn_mode_definitions.sizeHint().width()) + 2 * MODE_SIDE_MARGIN
         self.btn_mode_keymap.setFixedWidth(mode_width)
         self.btn_mode_definitions.setFixedWidth(mode_width)
         layout_combobox.addSpacing(12)

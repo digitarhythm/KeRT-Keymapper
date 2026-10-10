@@ -127,3 +127,12 @@ QPushButton[modeButton="true"]:checked {
 |---|---|
 | `test_mode_buttons.py::test_definitions_show_the_other_tabs_macros_first` / `test_definitions_open_on_tap_dance_each_time` | 各種定義を開くとタップダンスが選ばれる |
 | `test_mode_buttons.py::test_checked_mode_button_shows_in_every_theme` | Dark・Light・Nord で規則があり、押されたボタンが選択色で塗られる（±30）。KeRT Color には規則を足さない |
+
+## 8. 文字の左右の余白（2026-10-10）
+
+モードボタンの文字の左右に、スタイルの余白に加えて `MODE_SIDE_MARGIN = 12` px ずつ余白を足す。幅は広い方
+（「キーマッピング」）の推奨幅 + 2 × 12 px で、2 つのボタンをそろえる。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_mode_buttons.py::test_buttons_right_of_the_logo` | どちらのボタンも「幅 − 文字の幅」が 2 × `MODE_SIDE_MARGIN` + 16 px 以上、2 つは同じ幅 |

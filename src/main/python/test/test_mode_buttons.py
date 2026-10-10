@@ -42,6 +42,13 @@ def test_buttons_right_of_the_logo(qtbot):
     assert mw.font().pointSizeF() < km.font().pointSizeF() < mw.combobox_devices.font().pointSizeF()
     assert df.font().pointSizeF() == km.font().pointSizeF()
     assert km.width() == df.width()
+    # more room left and right of the text (2026-10-10): each side at least MODE_SIDE_MARGIN more than the
+    # style's own padding
+    import main_window
+    assert main_window.MODE_SIDE_MARGIN >= 10
+    for b in (km, df):
+        text = b.fontMetrics().horizontalAdvance(b.text())
+        assert b.width() - text >= 2 * main_window.MODE_SIDE_MARGIN + 16, (b.text(), b.width(), text)
     assert km.isCheckable() and df.isCheckable()
 
 
@@ -109,7 +116,7 @@ def test_checked_mode_button_shows_in_every_theme(qtbot):
             btn.style().unpolish(btn)
             btn.style().polish(btn)
             img = btn.grab().toImage()
-            c = QColor(img.pixel(btn.width() // 6, btn.height() // 2))       # left of the text
+            c = QColor(img.pixel(6, btn.height() // 2))       # just inside the left edge, clear of the text
             hl = QApplication.palette().color(QPalette.Highlight)
             assert abs(c.red() - hl.red()) + abs(c.green() - hl.green()) + abs(c.blue() - hl.blue()) <= 30, \
                 (name, c.name(), hl.name())
