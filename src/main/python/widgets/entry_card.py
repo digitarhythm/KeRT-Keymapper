@@ -6,10 +6,12 @@ contents can be read without opening them one by one. The cards are laid out wit
 FlowLayout inside a scroll area.
 """
 from PyQt5.QtCore import QSize, Qt, QTimer
-from PyQt5.QtWidgets import QFrame, QLabel, QScrollArea, QSizePolicy, QStyle, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QSizePolicy, QStyle, \
+    QVBoxLayout, QWidget
 
 from tabbed_keycodes import TabbedKeycodes
 from widgets.flowlayout import FlowLayout
+from util import tr
 
 
 class EntryCard(QFrame):
@@ -26,10 +28,17 @@ class EntryCard(QFrame):
         self.header.setFont(font)
         self.header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
+        # the header line: the title, and buttons at its right (add_clear_button)
+        self.header_row = QHBoxLayout()
+        self.header_row.setContentsMargins(0, 0, 0, 0)
+        self.header_row.setSpacing(3)
+        self.header_row.addWidget(self.header, 1)
+        self.clear_button = None
+
         layout = QVBoxLayout()
         layout.setContentsMargins(3, 3, 3, 3)
         layout.setSpacing(3)
-        layout.addWidget(self.header)
+        layout.addLayout(self.header_row)
         layout.addWidget(body)
         layout.addStretch()
         self.setLayout(layout)
@@ -51,6 +60,13 @@ class EntryCard(QFrame):
 
     def set_title(self, text):
         self.header.setText(text)
+
+    def add_clear_button(self, callback):
+        """A "Clear" button at the card's top right (Tap Dance / HostOS: all four keys to none)"""
+        self.clear_button = QPushButton(tr("EntryCard", "Clear"))
+        self.clear_button.setFocusPolicy(Qt.NoFocus)
+        self.clear_button.clicked.connect(callback)
+        self.header_row.addWidget(self.clear_button, 0, Qt.AlignRight | Qt.AlignVCenter)
 
 
 class EntryCardContainer(QScrollArea):

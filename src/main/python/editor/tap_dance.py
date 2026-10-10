@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QWidget, QSizePolicy, QGridLayout, QVBoxLayout, QLab
     QPushButton, QSpinBox
 
 from protocol.constants import VIAL_PROTOCOL_DYNAMIC
-from widgets.key_widget import KeyWidget
+from widgets.key_widget import KeyWidget, chain
 from util import tr
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
@@ -64,6 +64,8 @@ class TapDanceEntryUI(QObject):
         self.container.addWidget(self.txt_tapping_term, 4, 1)
         for kc in (self.kc_on_tap, self.kc_on_hold, self.kc_on_double_tap, self.kc_on_tap_hold):
             kc.set_scale(CARD_KEY_SCALE)
+        # a key picked from the tray selects the next one (docs/entry-chain-spec.md)
+        chain([self.kc_on_tap, self.kc_on_hold, self.kc_on_double_tap, self.kc_on_tap_hold])
 
     def widget(self):
         return self.w2
@@ -93,6 +95,16 @@ class TapDanceEntryUI(QObject):
 
     def on_key_changed(self):
         self.key_changed.emit()
+
+    def clear(self):
+        """The card's Clear button: all four keys to none (the tapping term stays), stored once; then the
+        top key is selected for the tray, ready to be set again"""
+        for kc in (self.kc_on_tap, self.kc_on_hold, self.kc_on_double_tap, self.kc_on_tap_hold):
+            kc.blockSignals(True)
+            kc.set_keycode("KC_NO")
+            kc.blockSignals(False)
+        self.key_changed.emit()
+        self.kc_on_tap.select_for_tray()
 
     def on_timing_changed(self):
         self.timing_changed.emit()
@@ -132,7 +144,9 @@ class TapDance(BasicEditor):
             entry.key_changed.connect(self.on_key_changed)
             entry.timing_changed.connect(self.on_timing_changed)
             self.tap_dance_entries_available.append(entry)
-            self.cards_available.append(EntryCard(entry.widget()))
+            card = EntryCard(entry.widget())
+            card.add_clear_button(entry.clear)
+            self.cards_available.append(card)
 
     def rebuild_ui(self):
         # the last host_os_count slots are HostOS keys and are edited in the HostOS tab instead

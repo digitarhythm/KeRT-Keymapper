@@ -140,9 +140,19 @@ class KeyHoverOverlay(QWidget):
             p.setBrush(key_style.face_color())
             p.drawPath(path)
             text = legend_colour(btn)
+        # the legend grows with the face, like the keymap's hovered key (KeyboardWidget.key_transform):
+        # drawn in the button's own face rect, scaled about its centre by the face's growth
+        plain = face.adjusted(key_style.HOVER_GROW_PX, key_style.HOVER_GROW_PX,
+                              -key_style.HOVER_GROW_PX, -key_style.HOVER_GROW_PX)
+        p.save()
+        if plain.width() > 0 and plain.height() > 0:
+            p.translate(plain.center())
+            p.scale(face.width() / plain.width(), face.height() / plain.height())
+            p.translate(-plain.center())
         p.setPen(text)
         p.setFont(btn.font())
-        p.drawText(face, Qt.AlignCenter | Qt.TextWordWrap, legend_of(btn))
+        p.drawText(plain, Qt.AlignCenter | Qt.TextWordWrap, legend_of(btn))
+        p.restore()
         out = key_style.HOVER_FRAME_GAP + key_style.HOVER_FRAME_WIDTH / 2
         p.setPen(QPen(QColor(key_style.HOVER_RING_COLOR), key_style.HOVER_FRAME_WIDTH))
         p.setBrush(Qt.NoBrush)

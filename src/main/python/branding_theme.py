@@ -246,6 +246,11 @@ def key_button_style(colors):
         QPushButton[layerButton="true"][lit="true"], QPushButton[layerButton="true"][lit="true"]:disabled {{
             color: {hlt};
         }}
+        /* a hovered (grown) layer button: LayerHighlight draws its label, grown with the face */
+        QPushButton[layerButton="true"][hoverLabel="true"],
+        QPushButton[layerButton="true"][hoverLabel="true"]:disabled {{
+            color: transparent;
+        }}
     """.format(face=key_style.face_css(), legend=key_style.KEY_LEGEND, r=key_style.KEY_RADIUS,
                hover=key_style.face_css(key_style.KEY_HOVER_FACE), hl=colors[QPalette.Highlight], hlt=colors[QPalette.HighlightedText],
                ml=key_style.KEY_MARGINS[0], mt=key_style.KEY_MARGINS[1], mr=key_style.KEY_MARGINS[2],

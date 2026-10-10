@@ -555,3 +555,49 @@ def test_sliding_box_goes_over_its_hovered_target(qtbot):
     assert probe_y > top2 + 2, "... lies over button 2"
     x = b2.mapTo(parent, b2.rect().topLeft()).x() + b2.width() // 3
     assert QColor(shot(parent).pixel(x, probe_y)) == QApplication.palette().color(QPalette.Highlight)
+
+
+def test_picker_hovered_legend_grows_with_the_key(qtbot):
+    """the hovered picker key's legend is drawn larger with the face, like the keymap's keys (2026-10-10)"""
+    mw, keys, a, right = picker_setup(qtbot)
+    win = a.window()
+    f = face_of(a, win)
+
+    def legend_box():
+        img = win.grab().toImage()
+        dark = [(x, y) for x in range(f.left() - 6, f.right() + 7) for y in range(f.top() - 6, f.bottom() + 7)
+                if QColor(img.pixel(x, y)).lightness() < 90 and f.adjusted(4, 4, -4, -4).contains(x, y)]
+        xs, ys = [p[0] for p in dark], [p[1] for p in dark]
+        return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+    w0, h0 = legend_box()
+    enter(a)
+    w1, h1 = legend_box()
+    assert h1 >= h0 + 1 and w1 >= w0 + 1, ((w0, h0), (w1, h1))
+
+
+def test_layer_button_legend_grows_with_the_button(qtbot):
+    """the hovered layer button's number is drawn larger with its face, like the keys (2026-10-10)"""
+    from test_dark_keys import shot
+    ke, hl, buttons = layer_setup(qtbot)
+    b = buttons[2]                                  # not the current layer
+    parent = hl.parentWidget()
+    tl = b.mapTo(parent, b.rect().topLeft())
+
+    def legend_box():
+        img = shot(parent)
+        dark = [(x, y) for x in range(tl.x() + 6, tl.x() + b.width() - 6) for y in range(tl.y() + 6, tl.y() + b.height() - 6)
+                if QColor(img.pixel(x, y)).lightness() < 90]
+        xs, ys = [p[0] for p in dark], [p[1] for p in dark]
+        return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+    w0, h0 = legend_box()
+    enter(b)
+    qtbot.waitUntil(lambda: hl.zoom_progress(2) == 1.0, timeout=1000)
+    w1, h1 = legend_box()
+    assert h1 >= h0 + 1 and w1 >= w0, ((w0, h0), (w1, h1))
+    from PyQt5.QtWidgets import QPushButton
+    assert QPushButton.text(b) == "2", "the button keeps its text"
+    leave(b)
+    qtbot.waitUntil(lambda: hl.zoom_progress(2) == 0.0, timeout=1000)
+    assert legend_box() == (w0, h0), "back to its size"

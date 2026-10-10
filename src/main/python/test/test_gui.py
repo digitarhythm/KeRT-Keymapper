@@ -335,8 +335,9 @@ def test_key_change(qtbot):
     # check the new keycode is LCTL()
     assert vk.keymap[0][0][1] == 0x100
 
-    # check that we moved to the next key after setting the second key
-    assert mw.keymap_editor.container.active_key == mw.keymap_editor.container.widgets[2]
+    # a keycode taking a "kc" keeps the same key selected, on its inner kc (2026-10-10, test_auto_mask.py)
+    assert mw.keymap_editor.container.active_key == mw.keymap_editor.container.widgets[1]
+    assert mw.keymap_editor.container.active_mask
 
     # click back on the second key
     point = mw.keymap_editor.container.widgets[1].bbox[0]

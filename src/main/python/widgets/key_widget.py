@@ -9,6 +9,14 @@ from tabbed_keycodes import TabbedKeycodes, keycode_filter_masked, keycode_filte
 from util import KeycodeDisplay
 
 
+def chain(keys):
+    """Tap Dance / HostOS cards (docs/entry-chain-spec.md): picking a keycode for one of `keys` from the
+    tray selects the next one; the last stays selected"""
+    for i, key in enumerate(keys):
+        key.chained = True
+        key.next_key = keys[i + 1] if i + 1 < len(keys) else None
+
+
 class KeyWidget(KeyboardWidget):
 
     changed = pyqtSignal()
@@ -21,6 +29,9 @@ class KeyWidget(KeyboardWidget):
 
         self.keycode = "KC_NO"
         self.set_keycode_filter(keycode_filter)
+        # chain(): after a pick from the tray, select next_key (Tap Dance / HostOS cards)
+        self.chained = False
+        self.next_key = None
 
         key = Key()
         key.row = key.col = 0
@@ -59,6 +70,7 @@ class KeyWidget(KeyboardWidget):
     def on_keycode_changed(self, keycode):
         """ Unlike set_keycode, this handles setting masked keycode inside the mask """
 
+        was_mask = self.active_mask
         if self.active_mask:
             if not Keycode.is_basic(keycode):
                 return
@@ -67,6 +79,25 @@ class KeyWidget(KeyboardWidget):
                 return
             keycode = kc.qmk_id.replace("(kc)", "({})".format(keycode))
         self.set_keycode(keycode)
+        if self.chained:
+            self.after_pick(was_mask)
+
+    def after_pick(self, was_mask):
+        """Chained keys (chain()): a keycode taking a kc selects its kc first; then the next key is
+        selected for the tray; the last key stays selected"""
+        if not was_mask and self.widgets and self.widgets[0].masked:
+            self.active_mask = True
+            self.update()
+            TabbedKeycodes.open_tray(self, keycode_filter_masked)
+        elif self.next_key is not None:
+            self.next_key.select_for_tray()
+
+    def select_for_tray(self):
+        """Select this key (the whole key) and point the keycode tray at it"""
+        self.active_key = self.widgets[0]
+        self.active_mask = False
+        self.update()
+        TabbedKeycodes.open_tray(self, self.keycode_filter)
 
     def on_anykey(self):
         if self.active_key is None:

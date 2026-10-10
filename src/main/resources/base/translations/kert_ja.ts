@@ -762,4 +762,11 @@ or select Security-&gt;Lock from the menu.</source>
         <translation>下のプログレスバーがいっぱいになるまで、次のキーを押し続けてください:</translation>
     </message>
 </context>
+<context>
+    <name>EntryCard</name>
+    <message>
+        <source>Clear</source>
+        <translation>クリア</translation>
+    </message>
+</context>
 </TS>

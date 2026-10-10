@@ -10,7 +10,7 @@ import math
 
 from PyQt5.QtCore import QElapsedTimer, QEasingCurve, QEvent, QPropertyAnimation, QRectF, Qt, QTimer, pyqtProperty
 from PyQt5.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
-from PyQt5.QtWidgets import QApplication, QWidget
+from PyQt5.QtWidgets import QApplication, QPushButton, QWidget
 
 import key_style
 
@@ -165,7 +165,22 @@ class LayerHighlight(QWidget):
                 self.zoom[i] = p
         if all(v == (1.0 if i == self.hover_index else 0.0) for i, v in self.zoom.items()):
             self.zoom_timer.stop()
+        self.update_hover_labels()
         self.update()
+
+    def update_hover_labels(self):
+        """A grown button's own label is hidden (stylesheet: [hoverLabel="true"]): paintEvent draws it,
+        grown with the face"""
+        for i, b in enumerate(self.buttons):
+            try:
+                want = self.zoom.get(i, 0.0) > 0.0
+                if bool(b.property("hoverLabel")) != want:
+                    b.setProperty("hoverLabel", want)
+                    b.style().unpolish(b)
+                    b.style().polish(b)
+                    b.update()
+            except RuntimeError:
+                pass
 
     def live_buttons(self):
         live = []
@@ -308,4 +323,25 @@ class LayerHighlight(QWidget):
             p.setBrush(Qt.NoBrush)
             p.drawRoundedRect(faces[i].adjusted(-out, -out, out, out), key_style.HOVER_FRAME_RADIUS,
                               key_style.HOVER_FRAME_RADIUS)
+        # the grown buttons' labels, grown with their faces like the keymap's keys (the buttons' own
+        # labels are hidden meanwhile: update_hover_labels)
+        for i in order:
+            if self.zoom.get(i, 0.0) <= 0.0:
+                continue
+            b = self.buttons[i]
+            plain = self.button_rect(i)
+            if plain.width() <= 0 or plain.height() <= 0:
+                continue
+            p.save()
+            p.translate(plain.center())
+            p.scale(faces[i].width() / plain.width(), faces[i].height() / plain.height())
+            p.translate(-plain.center())
+            lit = bool(b.property("lit"))
+            colour = pal.color(QPalette.HighlightedText) if lit else (
+                QColor(key_style.KEY_LEGEND) if key_style.DARK_KEYS else pal.color(QPalette.ButtonText))
+            p.setPen(colour)
+            p.setFont(b.font())
+            # the label Qt shows (SquareButton's own .text attribute stays empty for SquareButton("2"))
+            p.drawText(plain, Qt.AlignCenter, QPushButton.text(b))
+            p.restore()
         p.end()

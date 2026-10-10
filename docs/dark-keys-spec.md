@@ -271,3 +271,28 @@ flowchart TD
 |---|---|
 | `test_key_hover.py::test_hover_ring_constants` | 枠の色が黒 |
 | 枠を調べる各テスト（`is_ring()`） | 枠の位置が `HOVER_RING_COLOR` の色（±12） |
+
+### 5.8 下段のキーの文字も一緒に大きく（2026-10-10）
+
+下段（ピッカー）で乗せたキーは、地だけでなく文字も拡大する。重ね板（`KeyHoverOverlay.paintEvent`）は、文字を
+ボタン本来の地の四角に描き、その中心を基準に「拡大した地 ÷ 元の地」の比（縦横それぞれ）で拡大して描く。上段の
+キーマップ（`KeyboardWidget.key_transform`）と同じ拡大の仕方。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_picker_hovered_legend_grows_with_the_key` | 乗せると文字の濃い部分の幅・高さが広がる |
+
+### 5.9 レイヤーボタンの文字も一緒に大きく（2026-10-10）
+
+レイヤーボタンの数字はボタン（透明な `QPushButton`）自身が描くので、外から拡大できない。フォントを大きくすると
+ボタンの大きさが変わって並びがずれるため、次のようにする。
+
+- 乗せている（拡大中の）ボタンには `hoverLabel` 属性を付け、スタイルシートで文字色を透明にして自分では描かせない
+  （`LayerHighlight.update_hover_labels()`、`:disabled` も指定）。
+- 代わりに `LayerHighlight.paintEvent` が、そのボタンの文字（`QPushButton.text()`、フォントはボタンのもの）を、
+  ボタンの四角の中心を基準に「拡大した地 ÷ 元の四角」の比で拡大し、地・四角・枠の後に描く。色は今のレイヤー
+  （`lit`）なら選択文字色、それ以外はキーの文字色。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_key_hover.py::test_layer_button_legend_grows_with_the_button` | 乗せると数字の幅・高さが広がり、離れると元に戻る。ボタンの文字そのものは変わらない |

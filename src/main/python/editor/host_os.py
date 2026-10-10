@@ -6,7 +6,7 @@ from PyQt5.QtCore import pyqtSignal, QObject
 from PyQt5.QtWidgets import QWidget, QSizePolicy, QGridLayout, QVBoxLayout, QLabel
 
 from protocol.constants import VIAL_PROTOCOL_DYNAMIC
-from widgets.key_widget import KeyWidget
+from widgets.key_widget import KeyWidget, chain
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
 from widgets.entry_card import EntryCard, EntryCardContainer
@@ -68,6 +68,8 @@ class HostOSEntryUI(QObject):
             kc.changed.connect(self.on_key_changed)
             self.container.addWidget(kc, row, 1)
             self.kc_fields.append(kc)
+        # a key picked from the tray selects the next one (docs/entry-chain-spec.md)
+        chain(self.kc_fields)
 
     def set_td_idx(self, td_idx):
         self.td_idx = td_idx
@@ -90,6 +92,16 @@ class HostOSEntryUI(QObject):
 
     def on_key_changed(self):
         self.key_changed.emit()
+
+    def clear(self):
+        """The card's Clear button: all four keys to none, stored once; then the top key is selected for
+        the tray, ready to be set again"""
+        for kc in self.kc_fields:
+            kc.blockSignals(True)
+            kc.set_keycode("KC_NO")
+            kc.blockSignals(False)
+        self.key_changed.emit()
+        self.kc_fields[0].select_for_tray()
 
 
 class HostOS(BasicEditor):
@@ -123,6 +135,7 @@ class HostOS(BasicEditor):
             entry.key_changed.connect(partial(self.on_key_changed, x))
             self.host_os_entries_available.append(entry)
             card = EntryCard(entry.widget())
+            card.add_clear_button(entry.clear)
             card.set_title("HOS({})".format(x))
             self.cards_available.append(card)
 

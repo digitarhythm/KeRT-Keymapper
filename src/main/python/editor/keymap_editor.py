@@ -391,11 +391,19 @@ class KeymapEditor(BasicEditor):
         if self.container.active_key is None:
             return
 
-        if isinstance(self.container.active_key, EncoderWidget):
+        key, was_mask = self.container.active_key, self.container.active_mask
+        if isinstance(key, EncoderWidget):
             self.set_key_encoder(keycode)
         else:
             self.set_key_matrix(keycode)
 
+        if not was_mask and key.masked and self.container.active_key is key:
+            # a keycode that takes a "kc" (LT1(kc), LCTL_T(kc) ...): select its inner kc at once, so the next
+            # pick fills it; the selection moves on after that (2026-10-10, docs/auto-mask-spec.md)
+            self.container.active_mask = True
+            self.container.update()
+            self.on_key_clicked()
+            return
         self.container.select_next()
 
     def set_key_encoder(self, keycode):

@@ -141,8 +141,10 @@ def test_picker_key_buttons(qtbot):
     mw, vk = prepare(qtbot, FAKE_KEYBOARD)
     qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
     ak = mw.keymap_editor.tabbed_keycodes.all_keycodes
+    # wait for the "A" key itself (under a parallel test run the picker fills in a little later)
     qtbot.waitUntil(lambda: any(isinstance(x, SquareButton) and x.isVisible() and x.property("keyButton")
-                                for x in ak.currentWidget().findChildren(SquareButton)))
+                                and x.text == "A" for x in ak.currentWidget().findChildren(SquareButton)),
+                    timeout=5000)
     keys = [x for x in ak.currentWidget().findChildren(SquareButton) if x.isVisible()]
     assert all(x.property("keyButton") for x in keys if not isinstance(x, EntryCardButton))
     btn = next(x for x in keys if x.property("keyButton") and x.text == "A")    # SquareButton keeps .text as a str
