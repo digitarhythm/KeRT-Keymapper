@@ -64,7 +64,7 @@ def test_starts_in_key_mapping_mode(qtbot):
 def test_definitions_show_the_other_tabs_macros_first(qtbot):
     mw = window(qtbot)
     qtbot.mouseClick(mw.btn_mode_definitions, Qt.LeftButton)
-    assert mw.mode == "definitions"
+    qtbot.waitUntil(lambda: mw.mode == "definitions" and not mw.busy_overlay_shown(), timeout=2000)
     assert mw.btn_mode_definitions.isChecked() and not mw.btn_mode_keymap.isChecked()
     shown = labels(mw)
     assert "Keymap" not in shown
@@ -79,6 +79,7 @@ def test_definitions_show_the_other_tabs_macros_first(qtbot):
     assert mw.tabs.tabBar().isVisible()
     # back to Key mapping
     qtbot.mouseClick(mw.btn_mode_keymap, Qt.LeftButton)
+    qtbot.waitUntil(lambda: mw.mode == "keymap" and not mw.busy_overlay_shown(), timeout=2000)
     assert labels(mw) == ["Keymap"] and not mw.tabs.tabBar().isVisible()
     assert mw.tabs.currentWidget().editor is mw.keymap_editor
 
@@ -149,3 +150,33 @@ def test_mode_buttons_translated():
                    ("Key Overrides", "キー上書き"), ("Alt Repeat Key", "代替キー"), ("QMK Settings", "QMK設定"),
                    ("Matrix tester", "キーテスター")):
         assert found.get(en) == ja, en
+
+
+def test_mode_click_covers_the_window_while_switching(qtbot, monkeypatch):
+    """a mode button click can take a while (more so in the browser): a translucent black cover with a
+    spinner (widgets/busy_overlay.py) shows at once, the mode switches a moment later under it, the new page
+    is painted, then the cover goes (2026-10-10)"""
+    mw = window(qtbot)
+    switched = []
+    original = mw.set_mode
+    monkeypatch.setattr(mw, "set_mode", lambda mode: (switched.append((mode, mw.busy_overlay_shown())),
+                                                      original(mode)))
+    qtbot.mouseClick(mw.btn_mode_definitions, Qt.LeftButton)
+    assert mw.busy_overlay_shown(), "the cover comes at once"
+    assert switched == [] and mw.mode == "keymap", "the switch waits for the cover to show"
+    qtbot.waitUntil(lambda: mw.mode == "definitions" and not mw.busy_overlay_shown(), timeout=2000)
+    assert switched == [("definitions", True)], "switched under the cover"
+    # the button of the current mode does nothing
+    qtbot.mouseClick(mw.btn_mode_definitions, Qt.LeftButton)
+    assert not mw.busy_overlay_shown() and switched == [("definitions", True)]
+
+
+def test_web_mode_cover_is_drawn_by_the_page(qtbot, monkeypatch):
+    import types
+    sent = []
+    monkeypatch.setitem(sys.modules, "vialglue", types.SimpleNamespace(busy=sent.append))
+    mw = window(qtbot)
+    monkeypatch.setattr(sys, "platform", "emscripten")      # busy_overlay.set_busy asks the page then
+    mw.choose_mode("definitions")
+    assert sent == [1]
+    qtbot.waitUntil(lambda: mw.mode == "definitions" and sent == [1, 0], timeout=2000)

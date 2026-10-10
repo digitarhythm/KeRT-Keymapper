@@ -136,3 +136,31 @@ QPushButton[modeButton="true"]:checked {
 | テスト | 確認内容 |
 |---|---|
 | `test_mode_buttons.py::test_buttons_right_of_the_logo` | どちらのボタンも「幅 − 文字の幅」が 2 × `MODE_SIDE_MARGIN` + 16 px 以上、2 つは同じ幅 |
+
+## 9. 切り替え中の覆い（2026-10-10）
+
+モードボタンを押してから切り替わるまで時間がかかることがある（特にブラウザ版）ので、テーマの切り替えと同じ
+半透明の黒の覆いとローディングスピナー（`widgets/busy_overlay.py`。ブラウザ版はページが描く）を出す。
+
+- ボタン → `MainWindow.choose_mode(mode)`: 今のモードなら何もしない。覆いを出し、`THEME_COVER_MS`（50 ms）後に
+  `apply_mode()`。
+- `apply_mode()`: `set_mode()` で切り替え、新しいページを覆いの下で描き（`centralWidget().repaint()`。覆いを
+  外した後に重い描画が残らないように）、覆いを外す。
+- `set_mode()` はこれまでどおりすぐ切り替える（テストや `find_tab` から使う）。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant M as MainWindow
+    participant B as 覆い
+    U->>M: 「各種定義」を押す
+    M->>B: set_busy(True)
+    Note over M: 50 ms 待つ（覆いが画面に出る）
+    M->>M: set_mode() → 新しいページを描く（repaint）
+    M->>B: set_busy(False)
+```
+
+| テスト | 確認内容 |
+|---|---|
+| `test_mode_buttons.py::test_mode_click_covers_the_window_while_switching` | 押した直後に覆いが出てモードはまだ前のまま。覆いの下で切り替わり、終わると覆いが消える。今のモードのボタンでは何もしない |
+| `test_mode_buttons.py::test_web_mode_cover_is_drawn_by_the_page` | ブラウザ版は `vialglue.busy(1)` / `busy(0)` |

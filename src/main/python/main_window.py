@@ -145,7 +145,7 @@ class MainWindow(QMainWindow):
             btn.setFocusPolicy(Qt.NoFocus)
             btn.setFont(mode_font)
             btn.setFixedHeight(round(self.combobox_devices.minimumHeight() * MODE_HEIGHT_RATIO))
-            btn.clicked.connect(lambda checked, m=mode: self.set_mode(m))
+            btn.clicked.connect(lambda checked, m=mode: self.choose_mode(m))
             self.mode_group.addButton(btn)
         mode_width = max(self.btn_mode_keymap.sizeHint().width(),
                          self.btn_mode_definitions.sizeHint().width()) + 2 * MODE_SIDE_MARGIN
@@ -462,6 +462,23 @@ class MainWindow(QMainWindow):
     def in_mode(self, label):
         """Key mapping mode shows the Keymap editor, Definitions mode every other one"""
         return (label == "Keymap") == (self.mode == "keymap")
+
+    def choose_mode(self, mode):
+        """A mode button click: switching can take a while (more so in the browser), so a translucent black
+        cover with a spinner shows first; the mode switches a moment later under it, the new page is painted,
+        then the cover goes (2026-10-10)"""
+        if mode == self.mode:
+            return
+        busy_overlay.set_busy(self, True)
+        QTimer.singleShot(THEME_COVER_MS, lambda: self.apply_mode(mode))
+
+    def apply_mode(self, mode):
+        try:
+            self.set_mode(mode)
+            # paint the new page now, under the cover, rather than after it has gone
+            self.centralWidget().repaint()
+        finally:
+            busy_overlay.set_busy(self, False)
 
     def set_mode(self, mode):
         """The header's mode buttons: "keymap" (the keymap alone, no tab bar) or "definitions" (the other
