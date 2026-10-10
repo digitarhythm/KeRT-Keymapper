@@ -42,20 +42,24 @@ def pick(kc):
     TabbedKeycodes.tray.on_tray_keycode_changed(kc)
 
 
+KEYS = ("KC_A", "KC_B", "KC_C", "KC_D", "KC_E")
+
+
 def check_chain(qtbot, mw, card):
     from tabbed_keycodes import TabbedKeycodes
     w = fields(card)
+    n = len(w)
     click(qtbot, w[0])
     assert TabbedKeycodes.tray.target is w[0]
-    for i, kc in enumerate(("KC_A", "KC_B", "KC_C")):
+    for i, kc in enumerate(KEYS[:n - 1]):
         pick(kc)
         assert w[i].keycode == kc
         assert TabbedKeycodes.tray.target is w[i + 1], "the next key is selected"
         assert w[i + 1].active_key is not None and w[i].active_key is None
         assert mw.tray_keycodes.isVisible(), "the tray stays open"
-    pick("KC_D")
-    assert w[3].keycode == "KC_D"
-    assert TabbedKeycodes.tray.target is w[3] and w[3].active_key is not None, "the fourth stays selected"
+    pick(KEYS[n - 1])
+    assert w[n - 1].keycode == KEYS[n - 1]
+    assert TabbedKeycodes.tray.target is w[n - 1] and w[n - 1].active_key is not None, "the last stays selected"
 
 
 def test_tap_dance_moves_to_the_next_key(qtbot):
@@ -123,3 +127,29 @@ def test_clear_is_translated():
     found = [m.find("translation").text for ctx in root.findall("context") if ctx.find("name").text == "EntryCard"
              for m in ctx.findall("message") if m.find("source").text == "Clear"]
     assert found == ["クリア"]
+
+
+# ---- Combos: Key 1..4 and the Output key, chained the same way, with a Clear button (2026-10-10)
+
+def combos(qtbot):
+    from test_gui import prepare, find_tab, FAKE_KEYBOARD
+    mw, vk = prepare(qtbot, FAKE_KEYBOARD, combos=[[4, 5, 6, 7, 8], [0, 0, 0, 0, 0]])
+    qtbot.waitUntil(lambda: mw.centralWidget().isVisible())
+    return mw, vk, find_tab(mw, "Combos").editor
+
+
+def test_combos_move_to_the_next_key(qtbot):
+    mw, vk, ce = combos(qtbot)
+    assert len(fields(ce.cards[1])) == 5
+    check_chain(qtbot, mw, ce.cards[1])
+    assert vk.combos[1] == (4, 5, 6, 7, 8), "Key 1..4, then the Output key"
+
+
+def test_clear_button_combos(qtbot):
+    mw, vk, ce = combos(qtbot)
+    card = ce.cards[0]
+    assert card.clear_button is not None and card.clear_button.text() == "Clear"
+    qtbot.mouseClick(card.clear_button, Qt.LeftButton)
+    assert [f.keycode for f in fields(card)] == ["KC_NO"] * 5
+    assert vk.combos[0] == (0, 0, 0, 0, 0)
+    check_top_selected(mw, card)

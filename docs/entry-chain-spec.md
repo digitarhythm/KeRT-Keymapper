@@ -1,4 +1,4 @@
-# Tap Dance / HostOS: 続けて設定・クリアボタン 仕様書（2026-10-10）
+# Tap Dance / HostOS / Combos: 続けて設定・クリアボタン 仕様書（2026-10-10）
 
 ## 1. 目的
 
@@ -32,8 +32,7 @@ flowchart TD
 ## 3. クリアボタン
 
 - `EntryCard.add_clear_button(callback)`: カードの見出し行の右端に「Clear」（日本語「クリア」、
-  `kert_ja.ts` の `EntryCard` コンテキスト）ボタンを置く。Tap Dance と HostOS のカードだけに付ける（Combos には
-  付けない）。
+  `kert_ja.ts` の `EntryCard` コンテキスト）ボタンを置く。Tap Dance・HostOS・Combos（§5）のカードに付ける。
 - `TapDanceEntryUI.clear()` / `HostOSEntryUI.clear()`: 4 つのキーをシグナルを止めて `KC_NO` にし、最後に
   `key_changed` を 1 回だけ出す（キーボードへの書き込みは 1 回）。Tap Dance の Tapping term は変えない。
 - クリアの後は、いちばん上のキー（Tap Dance: On tap、HostOS: Mac）を選び、トレイをそのキーに向ける
@@ -49,3 +48,16 @@ flowchart TD
 | `test_clear_button_tap_dance` | 見出し行の右上の「Clear」で 4 つが `KC_NO`、Tapping term はそのまま。いちばん上のキーが選ばれ、トレイが開く |
 | `test_clear_button_host_os` | HostOS でも同じ（いちばん上の Mac が選ばれる） |
 | `test_clear_is_translated` | 日本語訳が「クリア」 |
+
+## 5. Combos（2026-10-10 追加）
+
+Combos のカードも同じにする。Combos は 5 つ（Key 1〜4 と Output key）なので、Key 1 → Key 2 → Key 3 → Key 4 →
+Output key の順につなぎ、Output key を設定したら Output key を選んだまま。
+
+- `ComboEntryUI`: `chain(self.kc_inputs + [self.kc_output])`、`clear()`（5 つを `KC_NO` にして 1 回だけ保存し、
+  Key 1 を選ぶ）。カードに「クリア」ボタンを付ける。
+
+| テスト | 確認内容 |
+|---|---|
+| `test_entry_chain.py::test_combos_move_to_the_next_key` | Key 1〜4 を設定するたびに次へ、Output key で止まる。キーボードに保存される |
+| `test_entry_chain.py::test_clear_button_combos` | 「クリア」で 5 つが `KC_NO`、Key 1 が選ばれる |

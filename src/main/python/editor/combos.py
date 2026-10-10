@@ -4,7 +4,7 @@ from PyQt5.QtCore import pyqtSignal, QObject
 from PyQt5.QtWidgets import QWidget, QSizePolicy, QGridLayout, QVBoxLayout, QLabel
 
 from protocol.constants import VIAL_PROTOCOL_DYNAMIC
-from widgets.key_widget import KeyWidget
+from widgets.key_widget import KeyWidget, chain
 from vial_device import VialKeyboard
 from editor.basic_editor import BasicEditor
 from widgets.entry_card import EntryCard, EntryCardContainer
@@ -51,6 +51,9 @@ class ComboEntryUI(QObject):
         self.kc_output.changed.connect(self.on_key_changed)
         self.container.addWidget(QLabel(tr("Combos", "Output key")), 4, 0)
         self.container.addWidget(self.kc_output, 4, 1)
+        # a key picked from the tray selects the next one: Key 1..4, then the Output key
+        # (docs/entry-chain-spec.md)
+        chain(self.kc_inputs + [self.kc_output])
 
     def widget(self):
         return self.w2
@@ -79,6 +82,16 @@ class ComboEntryUI(QObject):
     def on_key_changed(self):
         self.key_changed.emit()
 
+    def clear(self):
+        """The card's Clear button: the four keys and the output key to none, stored once; then Key 1 is
+        selected for the tray, ready to be set again"""
+        for kc in self.kc_inputs + [self.kc_output]:
+            kc.blockSignals(True)
+            kc.set_keycode("KC_NO")
+            kc.blockSignals(False)
+        self.key_changed.emit()
+        self.kc_inputs[0].select_for_tray()
+
 
 class Combos(BasicEditor):
 
@@ -103,6 +116,7 @@ class Combos(BasicEditor):
             entry.key_changed.connect(self.on_key_changed)
             self.combo_entries_available.append(entry)
             card = EntryCard(entry.widget())
+            card.add_clear_button(entry.clear)
             card.set_title(tr("Combos", "Combo {}").format(x + 1))
             self.cards_available.append(card)
 
