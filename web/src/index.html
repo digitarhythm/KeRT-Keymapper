@@ -507,6 +507,16 @@ body {
         }, {capture: true, passive: false});
     }
 
+    // One tap clicked twice on touch devices: the picker assigned the picked keycode to the selected key, moved
+    // on to the next key (select_next) and assigned it there too. With -sPROXY_TO_PTHREAD, emscripten hands
+    // Qt's touch callbacks to the app thread asynchronously and drops their return value, so the touch events are
+    // never cancelled; the browser then sends its compatibility mousedown / mouseup after the touch, and Qt turns
+    // those into a second click on top of the one it synthesizes from the touch itself. Cancelling touchend here
+    // stops only those compatibility mouse events (and the double-tap zoom); Qt still receives the touch.
+    Module.canvas.addEventListener("touchend", function (e) {
+        if (e.cancelable) e.preventDefault();
+    }, {passive: false});
+
     function read_timeout() {
         console.log("device read timed out!");
         _vialglue_set_response_error();
