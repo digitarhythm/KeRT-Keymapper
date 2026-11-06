@@ -1,0 +1,61 @@
+name: Retry macOS build
+
+# macOS arm64 runners are often short: GitHub then cancels build-mac-arm64 ("The job was not acquired by
+# Runner ... even after multiple attempts") and the Release is skipped. When a CI run ends like that, or
+# with the macOS job over its timeout-minutes, re-run its failed jobs (the Release follows) and wait,
+# up to 3 more attempts. A real build error is not retried.
+# The retries loop here because a re-run started with GITHUB_TOKEN does not start this workflow again.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+# one retry loop per CI run at a time (in case a re-run's completion does start this again)
+concurrency:
+  group: retry-mac-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    # a run re-run by hand that fails again starts this anew; stop once a run has had 4 attempts
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt < 4
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      actions: write
+      checks: read
+
+    steps:
+    - name: Re-run while the macOS job was not run or timed out
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.event.workflow_run.id }}
+        MAX_RETRIES: 3
+      run: |
+        # true when the macOS job of the run's latest attempt did not get a runner or timed out
+        runner_problem() {
+          local job_id conclusion
+          read -r job_id conclusion < <(gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" \
+            -q '.jobs[] | select(.name == "build-mac-arm64") | (.id|tostring) + " " + .conclusion')
+          echo "build-mac-arm64: ${conclusion:-not found}"
+          [ -n "$job_id" ] && [ "$conclusion" != "success" ] || return 1
+          gh api "repos/$GH_REPO/check-runs/$job_id/annotations" -q '.[].message' |
+            grep -q -e "was not acquired by Runner" -e "exceeded the maximum execution time"
+        }
+
+        for retry in $(seq 1 "$MAX_RETRIES"); do
+          if ! runner_problem; then
+            echo "no runner problem: nothing to retry"
+            exit 0
+          fi
+          echo "retry $retry/$MAX_RETRIES: re-running the failed jobs"
+          gh run rerun "$RUN_ID" --failed
+          sleep 30
+          if gh run watch "$RUN_ID" --exit-status --interval 60 > /dev/null; then
+            echo "the run succeeded"
+            exit 0
+          fi
+        done
+        echo "still failing after $MAX_RETRIES retries"
+        exit 1
