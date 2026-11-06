@@ -21,6 +21,11 @@ if sys.platform == "emscripten":
             data = vialglue.read_device()
             return data
 
+        def close(self):
+            # the page owns the WebHID connection and keeps it for the session; Autorefresh closes the
+            # current device before selecting one again (e.g. keyboard chosen during the preload)
+            pass
+
 
     class hid:
 
