@@ -23,11 +23,11 @@ jobs:
         name: kert-keymapper-linux
         path: util/linux-builder/output/KeRT-Keymapper-x86_64.AppImage
 
-  # Native Apple Silicon build with PyInstaller (see util/macos/README.md). macos-14 runners are arm64.
+  # Native Apple Silicon build with PyInstaller (see util/macos/README.md). macos-15 runners are arm64.
   # The build takes about a minute; a hung runner is stopped after 20. A job that times out, or that
   # GitHub cancels because no arm64 runner was free, is re-run by retry-mac.yml.
   build-mac-arm64:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
 
     steps:

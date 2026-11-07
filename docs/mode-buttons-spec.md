@@ -173,6 +173,9 @@ sequenceDiagram
 - 位置: 「各種定義」ボタンのすぐ右（間を少し空ける）、キーボードのセレクターより左。上下はモードボタンの中央に
   そろえる。
 - 見た目: モードボタンより小さい文字で、控えめな色（テーマの無効文字の色）。
+- 幅: 余裕があれば文字の幅。狭いウィンドウでは縮んで（文字は切れる）、ウィンドウの最小幅を広げない。縦長の
+  ウィンドウ（縦向きのタブレットなど）を、表示を足す前と同じ幅まで狭められるようにするため（1.5.4 で最小幅が約 80 px
+  広がっていたのを修正）。
 - バージョンの出どころ: `main_window.app_version(appctx)`。
   1. `appctx.build_settings["version"]`（`src/build/settings/base.json`。デスクトップ版は fbs、ブラウザ版は
      `webmain` が読み込む）
@@ -187,4 +190,5 @@ flowchart LR
 | テスト | 確認内容 |
 |---|---|
 | `test_mode_buttons.py::test_version_right_of_definitions` | `ver ` + `base.json` のバージョンを表示。「各種定義」の右、セレクターの左、上下はモードボタンの中央（±2 px）。文字はモードボタン以下の大きさ |
+| `test_mode_buttons.py::test_version_does_not_widen_the_window` | 表示があってもヘッダーの最小幅は、無いときと比べて間隔（`VERSION_SPACING`）分しか増えない |
 | `test_mode_buttons.py::test_app_version_source` | `build_settings` の版を優先、無ければ `applicationVersion()`、どちらも無ければ空文字 |

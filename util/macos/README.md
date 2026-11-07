@@ -34,7 +34,7 @@ arm64 の Mac では作れず、CI でも arm64 しかビルドしていませ�
 
 | 対象 | ビルド環境 | 生成物 |
 |---|---|---|
-| Apple Silicon | arm64 の Python（M1 以降の Mac、`macos-14` ランナー） | `target/macos-arm64/kert-keymapper-mac-arm64.dmg` |
+| Apple Silicon | arm64 の Python（M1 以降の Mac、`macos-15` ランナー） | `target/macos-arm64/kert-keymapper-mac-arm64.dmg` |
 
 ## ローカルでのビルド
 
@@ -56,7 +56,7 @@ util/macos/build.sh
 
 ```mermaid
 flowchart LR
-    P["push / pull_request"] --> A["build-mac-arm64<br/>macos-14"]
+    P["push / pull_request"] --> A["build-mac-arm64<br/>macos-15"]
     A --> AA["Artifact: kert-keymapper-mac-arm64"]
     T["tag v* を push"] --> A
     T --> W["build-win<br/>windows-2025 (x64)"]

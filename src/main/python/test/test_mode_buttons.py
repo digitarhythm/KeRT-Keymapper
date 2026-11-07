@@ -218,3 +218,20 @@ def test_app_version_source():
         assert main_window.app_version(types.SimpleNamespace()) == ""
     finally:
         app.setApplicationVersion(saved)
+
+
+def test_version_does_not_widen_the_window(qtbot):
+    """the version label gives way in a narrow window: the header (and so the window) can get as narrow as
+    without it, so portrait windows stay possible (2026-11-07)"""
+    import main_window
+    mw = window(qtbot)
+
+    def header_min():
+        mw.layout_header.invalidate()
+        return mw.layout_header.minimumSize().width()
+
+    with_label = header_min()
+    mw.lbl_version.hide()
+    without_label = header_min()
+    mw.lbl_version.show()
+    assert with_label - without_label <= main_window.VERSION_SPACING + 1, (with_label, without_label)

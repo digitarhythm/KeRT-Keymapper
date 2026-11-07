@@ -173,7 +173,9 @@ class MainWindow(QMainWindow):
         self.lbl_version.setFont(version_font)
         self.lbl_version.setEnabled(False)          # the theme's muted (disabled) text colour
         self.lbl_version.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.lbl_version.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        # its text's width when there is room, but it gives way in a narrow window rather than widening it
+        self.lbl_version.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.lbl_version.setMinimumWidth(1)
         self.lbl_version.setVisible(bool(version))
         layout_combobox.addSpacing(VERSION_SPACING)
         layout_combobox.addWidget(self.lbl_version, 0)
