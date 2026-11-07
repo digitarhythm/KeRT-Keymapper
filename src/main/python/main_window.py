@@ -3,7 +3,7 @@ import logging
 import platform
 from json import JSONDecodeError
 
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtCore import Qt, QSettings, QStandardPaths, QTimer, QRect, QT_VERSION_STR
 from PyQt5.QtWidgets import QWidget, QComboBox, QToolButton, QHBoxLayout, QVBoxLayout, QMainWindow, QAction, qApp, \
     QFileDialog, QDialog, QTabWidget, QActionGroup, QMessageBox, QLabel, QSizePolicy, QPushButton, QButtonGroup
@@ -50,6 +50,17 @@ MODE_FONT_SMALLER = 2
 MODE_HEIGHT_RATIO = 0.8
 # extra room left and right of the mode buttons' text, each side, in pixels (2026-10-10)
 MODE_SIDE_MARGIN = 12
+# the app's version right of the mode buttons: this many points smaller than their font, this far from
+# them, in pixels (2026-11-07)
+VERSION_FONT_SMALLER = 2
+VERSION_SPACING = 10
+
+
+def app_version(appctx):
+    """The app's version: build_settings (src/build/settings/base.json, read by fbs and by webmain in the
+    browser, where applicationVersion() is not set), else QApplication.applicationVersion(), else "" """
+    settings = getattr(appctx, "build_settings", None) or {}
+    return settings.get("version") or qApp.applicationVersion()
 
 
 # inner margin of the header row (keyboard selector), in pixels
@@ -154,6 +165,18 @@ class MainWindow(QMainWindow):
         layout_combobox.addSpacing(12)
         layout_combobox.addWidget(self.btn_mode_keymap, 0)
         layout_combobox.addWidget(self.btn_mode_definitions, 0)
+        # the app's version, small and muted, right of the mode buttons (docs/mode-buttons-spec.md §10)
+        version = app_version(appctx)
+        self.lbl_version = QLabel("ver " + version)
+        version_font = QFont(mode_font)
+        version_font.setPointSize(mode_font.pointSize() - VERSION_FONT_SMALLER)
+        self.lbl_version.setFont(version_font)
+        self.lbl_version.setEnabled(False)          # the theme's muted (disabled) text colour
+        self.lbl_version.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.lbl_version.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.lbl_version.setVisible(bool(version))
+        layout_combobox.addSpacing(VERSION_SPACING)
+        layout_combobox.addWidget(self.lbl_version, 0)
         layout_combobox.addStretch(1)   # icon, logo and modes at the left, selector and Refresh at the right
         layout_combobox.addWidget(self.combobox_devices, 0)
         if sys.platform != "emscripten":

@@ -164,3 +164,27 @@ sequenceDiagram
 |---|---|
 | `test_mode_buttons.py::test_mode_click_covers_the_window_while_switching` | 押した直後に覆いが出てモードはまだ前のまま。覆いの下で切り替わり、終わると覆いが消える。今のモードのボタンでは何もしない |
 | `test_mode_buttons.py::test_web_mode_cover_is_drawn_by_the_page` | ブラウザ版は `vialglue.busy(1)` / `busy(0)` |
+
+## 10. アプリのバージョン表示（2026-11-07）
+
+いま使っているのがどの版か、画面ですぐ分かるように、「各種定義」ボタンの右にアプリのバージョンを出す。
+
+- 表示: `ver 1.5.3` の形（先頭に `ver` と空白）。押せない文字だけの表示（`QLabel`、`self.lbl_version`）。
+- 位置: 「各種定義」ボタンのすぐ右（間を少し空ける）、キーボードのセレクターより左。上下はモードボタンの中央に
+  そろえる。
+- 見た目: モードボタンより小さい文字で、控えめな色（テーマの無効文字の色）。
+- バージョンの出どころ: `main_window.app_version(appctx)`。
+  1. `appctx.build_settings["version"]`（`src/build/settings/base.json`。デスクトップ版は fbs、ブラウザ版は
+     `webmain` が読み込む）
+  2. 無ければ `QApplication.applicationVersion()`
+  3. どちらも無ければ空文字で、表示は隠す
+
+```mermaid
+flowchart LR
+    I[アイコン] --- L[ロゴ] --- K[キーマッピング] --- D[各種定義] --- V["ver 1.5.3"] --- S[...余白...] --- C[キーボード選択]
+```
+
+| テスト | 確認内容 |
+|---|---|
+| `test_mode_buttons.py::test_version_right_of_definitions` | `ver ` + `base.json` のバージョンを表示。「各種定義」の右、セレクターの左、上下はモードボタンの中央（±2 px）。文字はモードボタン以下の大きさ |
+| `test_mode_buttons.py::test_app_version_source` | `build_settings` の版を優先、無ければ `applicationVersion()`、どちらも無ければ空文字 |

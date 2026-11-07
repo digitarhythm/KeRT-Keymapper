@@ -1,3 +1,4 @@
+import json
 import lzma
 import os.path
 import struct
@@ -194,6 +195,12 @@ class FakeAppctx:
 
     def get_resource(self, path):
         return os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../resources/base/", path)
+
+    @property
+    def build_settings(self):
+        # what fbs (and webmain in the browser) read: src/build/settings/base.json
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../build/settings/base.json")) as f:
+            return json.load(f)
 
 
 all_mw = []

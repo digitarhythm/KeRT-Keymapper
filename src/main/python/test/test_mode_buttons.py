@@ -180,3 +180,41 @@ def test_web_mode_cover_is_drawn_by_the_page(qtbot, monkeypatch):
     mw.choose_mode("definitions")
     assert sent == [1]
     qtbot.waitUntil(lambda: mw.mode == "definitions" and sent == [1, 0], timeout=2000)
+
+
+def test_version_right_of_definitions(qtbot):
+    """the app's version, e.g. "ver 1.5.3", right of the Definitions button (2026-11-07)"""
+    import json
+    from PyQt5.QtWidgets import QLabel
+    mw = window(qtbot)
+    settings = os.path.join(os.path.dirname(__file__), "../../../build/settings/base.json")
+    with open(settings) as f:
+        version = json.load(f)["version"]
+    lbl = mw.lbl_version
+    assert isinstance(lbl, QLabel) and lbl.isVisible()
+    assert lbl.text() == "ver " + version
+    df = mw.btn_mode_definitions
+    gx = lambda w: w.mapToGlobal(w.rect().topLeft()).x()
+    gy = lambda w: w.mapToGlobal(w.rect().center()).y()
+    assert gx(df) + df.width() <= gx(lbl), "right of Definitions"
+    assert gx(lbl) + lbl.width() < gx(mw.combobox_devices), "left of the keyboard selector"
+    assert abs(gy(lbl) - gy(df)) <= 2, "centred on the mode buttons"
+    assert lbl.font().pointSizeF() <= df.font().pointSizeF()
+
+
+def test_app_version_source():
+    """build_settings (base.json) first, then QApplication.applicationVersion(), else nothing"""
+    import types
+    from PyQt5.QtWidgets import QApplication
+    import main_window
+    app = QApplication.instance()
+    saved = app.applicationVersion()
+    try:
+        app.setApplicationVersion("9.9.9")
+        assert main_window.app_version(types.SimpleNamespace(build_settings={"version": "1.2.3"})) == "1.2.3"
+        assert main_window.app_version(types.SimpleNamespace()) == "9.9.9"
+        assert main_window.app_version(types.SimpleNamespace(build_settings={})) == "9.9.9"
+        app.setApplicationVersion("")
+        assert main_window.app_version(types.SimpleNamespace()) == ""
+    finally:
+        app.setApplicationVersion(saved)
